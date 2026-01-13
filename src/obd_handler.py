@@ -9,9 +9,6 @@ class OBDHandler:
         self.connection = None
         self.status = "Disconnected"
         self.log_callback = log_callback
-
-        # SAFETY: Minimum time between commands (seconds)
-        # 0.05s = 50ms. Prevents flooding the CAN bus.
         self.inter_command_delay = 0.05
 
     def log(self, message):
@@ -30,7 +27,6 @@ class OBDHandler:
             return True
 
         try:
-            # fast=False ensures we initialize protocol slowly/safely
             self.connection = obd.OBD(fast=False)
             if self.connection.is_connected():
                 self.status = "Connected"
@@ -59,10 +55,7 @@ class OBDHandler:
 
         if hasattr(obd.commands, command_name):
             cmd = getattr(obd.commands, command_name)
-
-            # SAFETY: Prevent spamming
             time.sleep(self.inter_command_delay)
-
             try:
                 response = self.connection.query(cmd)
                 if response.is_null(): return None
@@ -76,7 +69,6 @@ class OBDHandler:
         self.log("Querying DTCs...")
         if self.simulation: return [("P0300", "Random/Multiple Cylinder Misfire")]
 
-        # SAFETY: DTC reading is heavy, sleep before
         time.sleep(0.2)
         res = self.connection.query(obd.commands.GET_DTC)
         return res.value if not res.is_null() else []
@@ -92,7 +84,7 @@ class OBDHandler:
             for name in sensor_list:
                 if hasattr(obd.commands, name):
                     cmd = getattr(obd.commands, name)
-                    time.sleep(self.inter_command_delay)  # SAFETY DELAY
+                    time.sleep(self.inter_command_delay)
                     response = self.connection.query(cmd, mode=2)
                     if not response.is_null():
                         snapshot[name] = response.value.magnitude
@@ -132,7 +124,6 @@ class OBDHandler:
         }
 
         if name == 'SPEED':
-            # 10% chance to be 0 (stopped), otherwise driving
             return 0 if random.random() < 0.1 else random.randint(0, 120)
 
         if name in ranges:

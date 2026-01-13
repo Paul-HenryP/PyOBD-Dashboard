@@ -3,25 +3,28 @@ import json
 import os
 import time
 from tkinter import filedialog, messagebox
+from collections import deque
+
+import matplotlib.pyplot as plt
+from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
+
 from data_logger import DataLogger
 from config_manager import ConfigManager
-from diagnostic_engine import DiagnosticEngine  # Import our new Engine
+from diagnostic_engine import DiagnosticEngine
 
-# --- MASTER CONFIGURATION ---
-# Format: "OBD_COMMAND": ("Display Name", "Unit", Default_Show, Default_Log, Default_Max_Threshold)
 AVAILABLE_SENSORS = {
     "RPM": ("Engine RPM", "", True, True, 6000),
-    "SPEED": ("Vehicle Speed", "km/h", True, True, 120),
-    "COOLANT_TEMP": ("Coolant Temp", "°C", True, True, 110),
-    "CONTROL_MODULE_VOLTAGE": ("Voltage", "V", True, False, 15),
-    "ENGINE_LOAD": ("Engine Load", "%", True, False, 90),
+    "SPEED": ("Vehicle Speed", "km/h", True, True, 160),
+    "COOLANT_TEMP": ("Coolant Temp", "°C", True, True, 120),
+    "CONTROL_MODULE_VOLTAGE": ("Voltage", "V", True, False, 16),
+    "ENGINE_LOAD": ("Engine Load", "%", True, False, 100),
     "THROTTLE_POS": ("Throttle Pos", "%", False, True, 100),
-    "INTAKE_TEMP": ("Intake Air Temp", "°C", False, False, 60),
-    "MAF": ("MAF Air Flow", "g/s", False, False, 100),
-    "FUEL_LEVEL": ("Fuel Level", "%", False, False, 0),  # 0 means no max limit check
-    "BAROMETRIC_PRESSURE": ("Barometric", "kPa", False, False, 0),
-    "TIMING_ADVANCE": ("Timing Adv", "°", False, False, 0),
-    "RUN_TIME": ("Run Time", "sec", False, False, 0)
+    "INTAKE_TEMP": ("Intake Air Temp", "°C", False, False, 80),
+    "MAF": ("MAF Air Flow", "g/s", False, False, 200),
+    "FUEL_LEVEL": ("Fuel Level", "%", False, False, 100),
+    "BAROMETRIC_PRESSURE": ("Barometric", "kPa", False, False, 200),
+    "TIMING_ADVANCE": ("Timing Adv", "°", False, False, 60),
+    "RUN_TIME": ("Run Time", "sec", False, False, 3600)
 }
 
 
@@ -35,9 +38,11 @@ class DashboardApp(ctk.CTk):
         self.config = ConfigManager.load_config()
         self.sensor_state = {}
 
-        # Window Setup
-        self.title("PyOBD Professional - Mechanic AI Edition")
-        self.geometry("1000x700")  # Made wider for the new settings columns
+        self.history_rpm = deque([0] * 60, maxlen=60)
+        self.history_speed = deque([0] * 60, maxlen=60)
+
+        self.title("PyOBD Professional - Ultimate Edition")
+        self.geometry("1100x800")
         ctk.set_appearance_mode("dark")
         self.protocol("WM_DELETE_WINDOW", self.on_close)
 
@@ -45,12 +50,14 @@ class DashboardApp(ctk.CTk):
         self.tabview.pack(fill="both", expand=True, padx=20, pady=20)
 
         self.tab_dash = self.tabview.add("Dashboard")
+        self.tab_graph = self.tabview.add("Live Graph")
         self.tab_diag = self.tabview.add("Diagnostics")
         self.tab_settings = self.tabview.add("Settings")
         self.tab_debug = self.tabview.add("Debug Log")
 
         self._init_sensor_state()
         self._setup_dashboard_tab()
+        self._setup_graph_tab()
         self._setup_diagnostics_tab()
         self._setup_settings_tab()
         self._setup_debug_tab()
@@ -64,21 +71,17 @@ class DashboardApp(ctk.CTk):
 
     def _init_sensor_state(self):
         saved_sensors = self.config.get("sensors", {})
-
         for cmd, (name, unit, def_show, def_log, def_limit) in AVAILABLE_SENSORS.items():
-            # Load defaults or saved values
             saved = saved_sensors.get(cmd, {})
-
             self.sensor_state[cmd] = {
-                "name": name,
-                "unit": unit,
+                "name": name, "unit": unit,
                 "show_var": ctk.BooleanVar(value=saved.get("show", def_show)),
                 "log_var": ctk.BooleanVar(value=saved.get("log", def_log)),
-                "limit_var": ctk.StringVar(value=str(saved.get("limit", def_limit))),  # User defined limit
-                "widget_value_label": None
+                "limit_var": ctk.StringVar(value=str(saved.get("limit", def_limit))),
+                "widget_value_label": None,
+                "widget_progress_bar": None
             }
 
-    # --- DASHBOARD TAB ---
     def _setup_dashboard_tab(self):
         self.frame_controls = ctk.CTkFrame(self.tab_dash, height=50)
         self.frame_controls.pack(fill="x", padx=10, pady=5)
@@ -95,65 +98,90 @@ class DashboardApp(ctk.CTk):
         for i, cmd in enumerate(active_sensors):
             row = i // cols;
             col = i % cols
+
             card = ctk.CTkFrame(self.dash_scroll)
             card.grid(row=row, column=col, padx=10, pady=10, sticky="nsew")
             self.dash_scroll.grid_columnconfigure(col, weight=1)
 
             title = f"{self.sensor_state[cmd]['name']}"
             if self.sensor_state[cmd]['unit']: title += f" ({self.sensor_state[cmd]['unit']})"
+            ctk.CTkLabel(card, text=title, font=("Arial", 12, "bold"), text_color="gray").pack(pady=(10, 0))
 
-            ctk.CTkLabel(card, text=title, font=("Arial", 14, "bold"), text_color="gray").pack(pady=(10, 0))
             val_lbl = ctk.CTkLabel(card, text="--", font=("Arial", 32, "bold"), text_color="#3498db")
-            val_lbl.pack(pady=(0, 10))
+            val_lbl.pack(pady=(0, 5))
             self.sensor_state[cmd]['widget_value_label'] = val_lbl
 
-    # --- SETTINGS TAB ---
+            bar = ctk.CTkProgressBar(card, width=200, height=10, progress_color="#3498db")
+            bar.set(0)
+            bar.pack(pady=(0, 15))
+            self.sensor_state[cmd]['widget_progress_bar'] = bar
+
+    def _setup_graph_tab(self):
+        self.fig, self.ax1 = plt.subplots(figsize=(6, 4), dpi=100)
+        self.fig.patch.set_facecolor('#2b2b2b')
+
+        self.ax1.set_facecolor('#2b2b2b')
+        self.ax1.set_ylabel('RPM', color='#3498db', fontsize=12, fontweight='bold')
+        self.ax1.tick_params(axis='y', labelcolor='#3498db', colors='white')
+        self.ax1.tick_params(axis='x', colors='white')
+        self.ax1.grid(True, color='#404040', linestyle='--', alpha=0.5)
+        self.ax1.set_ylim(0, 7000)
+
+        self.ax2 = self.ax1.twinx()
+        self.ax2.set_ylabel('Speed (km/h)', color='#e74c3c', fontsize=12, fontweight='bold')
+        self.ax2.tick_params(axis='y', labelcolor='#e74c3c', colors='white')
+        self.ax2.spines['bottom'].set_color('white');
+        self.ax2.spines['top'].set_color('white')
+        self.ax2.spines['left'].set_color('white');
+        self.ax2.spines['right'].set_color('white')
+        self.ax2.set_ylim(0, 160)
+
+        self.line_rpm, = self.ax1.plot([], [], color='#3498db', linewidth=2, label="RPM")
+        self.line_speed, = self.ax2.plot([], [], color='#e74c3c', linewidth=2, label="Speed")
+
+        self.canvas = FigureCanvasTkAgg(self.fig, master=self.tab_graph)
+        self.canvas.draw()
+        self.canvas.get_tk_widget().pack(fill="both", expand=True, padx=10, pady=10)
+
+    def update_graph(self):
+        x_data = list(range(len(self.history_rpm)))
+        self.line_rpm.set_data(x_data, self.history_rpm)
+        self.line_speed.set_data(x_data, self.history_speed)
+        self.ax1.set_xlim(0, len(self.history_rpm))
+        self.ax2.set_xlim(0, len(self.history_speed))
+        self.canvas.draw_idle()
+
     def _setup_settings_tab(self):
         lbl = ctk.CTkLabel(self.tab_settings, text="Sensor Configuration & Warnings", font=("Arial", 18, "bold"))
         lbl.pack(pady=10)
-
         header_frame = ctk.CTkFrame(self.tab_settings, fg_color="transparent")
         header_frame.pack(fill="x", padx=20)
-        # Columns
         ctk.CTkLabel(header_frame, text="Sensor Name", width=200, anchor="w").pack(side="left", padx=10)
-        ctk.CTkLabel(header_frame, text="Max Limit", width=80).pack(side="right", padx=5)  # New Column
+        ctk.CTkLabel(header_frame, text="Bar Max/Limit", width=80).pack(side="right", padx=5)
         ctk.CTkLabel(header_frame, text="Log", width=50).pack(side="right", padx=10)
         ctk.CTkLabel(header_frame, text="Show", width=50).pack(side="right", padx=10)
-
         self.settings_scroll = ctk.CTkScrollableFrame(self.tab_settings)
         self.settings_scroll.pack(fill="both", expand=True, padx=20, pady=5)
-
         for cmd, data in self.sensor_state.items():
             row = ctk.CTkFrame(self.settings_scroll)
             row.pack(fill="x", pady=2)
-
             ctk.CTkLabel(row, text=data["name"], width=200, anchor="w").pack(side="left", padx=10)
-
-            # Show Checkbox
             ctk.CTkCheckBox(row, text="", variable=data["show_var"], command=self.rebuild_dashboard_grid,
                             width=20).pack(side="right", padx=15)
-            # Log Checkbox
             ctk.CTkCheckBox(row, text="", variable=data["log_var"], width=20).pack(side="right", padx=15)
-            # Threshold Entry
-            entry = ctk.CTkEntry(row, textvariable=data["limit_var"], width=60)
-            entry.pack(side="right", padx=5)
-
+            ctk.CTkEntry(row, textvariable=data["limit_var"], width=60).pack(side="right", padx=5)
         frame_log = ctk.CTkFrame(self.tab_settings)
         frame_log.pack(fill="x", padx=20, pady=20)
         self.lbl_path = ctk.CTkLabel(frame_log, text=f"Save Path: {self.logger.log_dir}")
         self.lbl_path.pack(side="left", padx=10)
         ctk.CTkButton(frame_log, text="Change Folder", command=self.change_log_folder).pack(side="right", padx=10)
 
-    # --- DIAGNOSTICS TAB ---
     def _setup_diagnostics_tab(self):
         btn_frame = ctk.CTkFrame(self.tab_diag, fg_color="transparent")
         btn_frame.pack(pady=20)
-
-        # New "Analyze" Button
         self.btn_analyze = ctk.CTkButton(btn_frame, text="RUN ANALYSIS", fg_color="purple", width=150,
                                          command=self.run_analysis)
         self.btn_analyze.pack(side="left", padx=10)
-
         self.btn_scan = ctk.CTkButton(btn_frame, text="SCAN CODES", fg_color="blue", width=150, command=self.scan_codes)
         self.btn_scan.pack(side="left", padx=10)
         self.btn_backup = ctk.CTkButton(btn_frame, text="FULL BACKUP", fg_color="orange", width=150,
@@ -162,7 +190,6 @@ class DashboardApp(ctk.CTk):
         self.btn_clear = ctk.CTkButton(btn_frame, text="CLEAR CODES", fg_color="red", width=150,
                                        command=self.confirm_clear_codes)
         self.btn_clear.pack(side="left", padx=10)
-
         self.txt_dtc = ctk.CTkTextbox(self.tab_diag, width=700, height=350)
         self.txt_dtc.pack(pady=10)
         self.txt_dtc.insert("1.0",
@@ -175,12 +202,10 @@ class DashboardApp(ctk.CTk):
     def on_close(self):
         data_to_save = {"log_dir": self.logger.log_dir, "sensors": {}}
         for cmd, state in self.sensor_state.items():
-            data_to_save["sensors"][cmd] = {
-                "show": state["show_var"].get(),
-                "log": state["log_var"].get(),
-                "limit": state["limit_var"].get()  # Save the user threshold
-            }
+            data_to_save["sensors"][cmd] = {"show": state["show_var"].get(), "log": state["log_var"].get(),
+                                            "limit": state["limit_var"].get()}
         ConfigManager.save_config(data_to_save)
+        plt.close('all')
         self.destroy()
 
     def update_loop(self):
@@ -189,29 +214,42 @@ class DashboardApp(ctk.CTk):
             current_speed = 0
 
             for cmd, state in self.sensor_state.items():
-                if state["show_var"].get() or state["log_var"].get() or cmd == "SPEED":
+                if state["show_var"].get() or state["log_var"].get() or cmd in ["SPEED", "RPM",
+                                                                                "CONTROL_MODULE_VOLTAGE"]:
                     val = self.obd.query_sensor(cmd)
                     if val is not None:
                         data_snapshot[cmd] = val
                         if cmd == "SPEED": current_speed = val
 
-                        # Update UI
-                        if state["show_var"].get() and state["widget_value_label"]:
-                            state["widget_value_label"].configure(text=str(val))
+                        if state["show_var"].get():
+                            if state["widget_value_label"]:
+                                state["widget_value_label"].configure(text=str(val))
 
-                            # --- COLOR CODING LOGIC ---
                             try:
                                 limit = float(state["limit_var"].get())
-                                # Special case for Voltage (Low is bad too)
+                                color = "#3498db"
                                 if cmd == "CONTROL_MODULE_VOLTAGE" and (val < 11.5 or val > 15.5):
-                                    state["widget_value_label"].configure(text_color="red")
-                                # Standard Max Limit check
+                                    color = "red"
                                 elif limit > 0 and val > limit:
-                                    state["widget_value_label"].configure(text_color="red")
-                                else:
-                                    state["widget_value_label"].configure(text_color="#3498db")  # Default Blue
+                                    color = "red"
+
+                                if state["widget_value_label"]: state["widget_value_label"].configure(text_color=color)
+
+                                if state["widget_progress_bar"] and limit > 0:
+                                    progress = min(val / limit, 1.0)
+                                    state["widget_progress_bar"].set(progress)
+                                    state["widget_progress_bar"].configure(progress_color=color)
+
                             except ValueError:
-                                pass  # Ignore if user typed text instead of numbers in settings
+                                pass
+
+            rpm_val = data_snapshot.get("RPM", 0)
+            speed_val = data_snapshot.get("SPEED", 0)
+            self.history_rpm.append(rpm_val)
+            self.history_speed.append(speed_val)
+
+            if self.tabview.get() == "Live Graph":
+                self.update_graph()
 
             if current_speed > 0:
                 self.btn_clear.configure(state="disabled", text="MOVING...")
@@ -221,40 +259,26 @@ class DashboardApp(ctk.CTk):
             self.logger.write_row(data_snapshot)
         self.after(500, self.update_loop)
 
-    # --- NEW FEATURE: ANALYSIS ---
     def run_analysis(self):
-        """Gather data and run the Diagnostic Engine"""
         if not self.obd.is_connected():
-            self.txt_dtc.delete("1.0", "end")
+            self.txt_dtc.delete("1.0", "end");
             self.txt_dtc.insert("end", "Error: Connect to car first.")
             return
-
-        self.txt_dtc.delete("1.0", "end")
+        self.txt_dtc.delete("1.0", "end");
         self.txt_dtc.insert("end", "Gathering data for analysis...\n")
         self.update()
-
-        # 1. Gather Snapshot of ALL sensors (even hidden ones)
         snapshot = {}
         thresholds = {}
         for cmd, state in self.sensor_state.items():
-            val = self.obd.query_sensor(cmd)
-            snapshot[cmd] = val
+            snapshot[cmd] = self.obd.query_sensor(cmd)
             thresholds[cmd] = state["limit_var"].get()
-
-        # 2. Run Engine
-        self.txt_dtc.insert("end", "Analyzing Logic...\n\n")
         issues = DiagnosticEngine.analyze(snapshot, thresholds)
-
-        # 3. Report
         if not issues:
-            self.txt_dtc.insert("end",
-                                "✅ System Analysis Passed.\nNo obvious logic problems detected based on current sensor readings.")
+            self.txt_dtc.insert("end", "✅ System Analysis Passed.")
         else:
             self.txt_dtc.insert("end", f"⚠️ Found {len(issues)} Potential Issues:\n", "bold")
-            for issue in issues:
-                self.txt_dtc.insert("end", f"• {issue}\n")
+            for issue in issues: self.txt_dtc.insert("end", f"• {issue}\n")
 
-    # ... (Rest of the standard methods: toggle_connection, change_log_folder, append_debug_log, scan_codes, perform_full_backup, confirm_clear_codes) ...
     def toggle_connection(self):
         if self.obd.is_connected():
             self.obd.disconnect()
@@ -262,6 +286,8 @@ class DashboardApp(ctk.CTk):
             for cmd in self.sensor_state:
                 lbl = self.sensor_state[cmd]['widget_value_label']
                 if lbl: lbl.configure(text="--")
+                bar = self.sensor_state[cmd]['widget_progress_bar']
+                if bar: bar.set(0)
         else:
             self.btn_connect.configure(text="CONNECTING...", state="disabled")
             self.update()
@@ -277,20 +303,17 @@ class DashboardApp(ctk.CTk):
     def change_log_folder(self):
         new_dir = filedialog.askdirectory()
         if new_dir:
-            if self.logger.set_directory(new_dir):
-                self.lbl_path.configure(text=f"Save Path: {new_dir}")
+            if self.logger.set_directory(new_dir): self.lbl_path.configure(text=f"Save Path: {new_dir}")
 
     def append_debug_log(self, message):
-        self.txt_debug.insert("end", message + "\n")
+        self.txt_debug.insert("end", message + "\n");
         self.txt_debug.see("end")
 
     def scan_codes(self):
-        if not self.obd.is_connected():
-            self.txt_dtc.delete("1.0", "end")
-            self.txt_dtc.insert("end", "Error: Not Connected to Car.")
-            return
-        self.txt_dtc.delete("1.0", "end")
-        self.txt_dtc.insert("end", "Scanning...\n")
+        if not self.obd.is_connected(): self.txt_dtc.delete("1.0", "end"); self.txt_dtc.insert("end",
+                                                                                               "Error: Not Connected."); return
+        self.txt_dtc.delete("1.0", "end");
+        self.txt_dtc.insert("end", "Scanning...\n");
         self.update()
         codes = self.obd.get_dtc()
         self.txt_dtc.delete("1.0", "end")
@@ -301,11 +324,9 @@ class DashboardApp(ctk.CTk):
             for c in codes: self.txt_dtc.insert("end", f"• {c[0]}: {c[1]}\n")
 
     def perform_full_backup(self):
-        if not self.obd.is_connected():
-            messagebox.showerror("Error", "Connect to car first!")
-            return
-        self.txt_dtc.delete("1.0", "end")
-        self.txt_dtc.insert("end", "Reading System Data... (This may take 10s)\n")
+        if not self.obd.is_connected(): messagebox.showerror("Error", "Connect to car first!"); return
+        self.txt_dtc.delete("1.0", "end");
+        self.txt_dtc.insert("end", "Reading System Data...\n");
         self.update()
         codes = self.obd.get_dtc()
         snapshot = self.obd.get_freeze_frame_snapshot(list(self.sensor_state.keys()))
@@ -315,23 +336,21 @@ class DashboardApp(ctk.CTk):
         try:
             with open(filepath, 'w') as f:
                 json.dump(report, f, indent=4)
-            self.txt_dtc.insert("end", f"SUCCESS: Backup saved to:\n{filepath}\n\n")
-            self.txt_dtc.insert("end", f"Snapshot Data: {json.dumps(snapshot, indent=2)}")
+            self.txt_dtc.insert("end", f"SUCCESS: Backup saved to:\n{filepath}\n\n");
+            self.txt_dtc.insert("end", f"Snapshot: {json.dumps(snapshot, indent=2)}")
         except Exception as e:
             self.txt_dtc.insert("end", f"Error saving backup: {e}")
 
     def confirm_clear_codes(self):
-        if not self.obd.is_connected():
-            messagebox.showerror("Error", "Connect to car first!")
-            return
-        answer = messagebox.askyesno("WARNING: Clear Codes?",
+        if not self.obd.is_connected(): messagebox.showerror("Error", "Connect to car first!"); return
+        answer = messagebox.askyesno("WARNING",
                                      "Have you performed a FULL BACKUP yet?\n\nClearing codes will PERMANENTLY erase Freeze Frame data.\nProceed?")
         if answer:
-            self.txt_dtc.delete("1.0", "end")
-            self.txt_dtc.insert("end", "Attempting to clear codes...\n")
+            self.txt_dtc.delete("1.0", "end");
+            self.txt_dtc.insert("end", "Clearing codes...\n");
             self.update()
             if self.obd.clear_dtc():
-                self.txt_dtc.insert("end", "\nSUCCESS: Codes cleared.\n")
-                messagebox.showinfo("Success", "Codes have been cleared.")
+                self.txt_dtc.insert("end", "\nSUCCESS: Codes cleared.\n"); messagebox.showinfo("Success",
+                                                                                               "Codes cleared.")
             else:
                 self.txt_dtc.insert("end", "\nFAILED: Could not clear codes.")

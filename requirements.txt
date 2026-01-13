@@ -1,3 +1,4 @@
 obd
 customtkinter
 pyserial
+matplotlib
