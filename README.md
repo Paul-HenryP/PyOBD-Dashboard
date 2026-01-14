@@ -5,7 +5,7 @@ A modern, open-source OBD-II diagnostic tool and dashboard built with Python. De
 ## Features
 
 *   **Live Dashboard:** Real-time visualization of RPM, Speed, Coolant Temp, Voltage, and more.
-*   **Live Graphing:** distinct multi-axis graphing to correlate data (e.g., RPM vs. Fuel Pressure).
+*   **Live Graphing:** Distinct multi-axis graphing to correlate data (e.g., RPM vs. Fuel Pressure).
 *   **Automated Analysis:** Built-in logic engine to detect anomalies (e.g., high load at idle, overheating) based on sensor combinations.
 *   **Customizable Layout:** Toggle which sensors you want to see on the screen via the Settings tab.
 *   **Data Logging:** Automatically save sensor data to CSV files for Excel/Sheets analysis.
@@ -18,9 +18,13 @@ A modern, open-source OBD-II diagnostic tool and dashboard built with Python. De
 
 The open-source version supports standard OBD-II protocols (Emissions, RPM, Speed, Temps). However, manufacturers often hide specific data (Hybrid Battery Health, DPF Soot Levels, Transmission Temp) behind proprietary codes.
 
-**Pro Packs are available for purchase (~10 EUR per specific car model).**
+**Pro Packs are available for purchase on our Gumroad store.**
 
 These JSON packs unlock manufacturer-specific sensors for brands like Toyota, VW, Ford, and BMW etc.
+
+👉 [**Visit the PyOBD Data Store**]([https://paulhenryp.gumroad.com/?section=rVBpcW3kPr3ISlhBzRP7Qw%3D%3D#N34-S8KrTX-u9xtW8d-3Zw==])
+
+Do you have a specific car? If you help me verify the PIDs, I will give you the Pro Pack for free.
 
 ### How to install a Pro Pack:
 1.  Purchase/Download the `.json` file for your car model.
