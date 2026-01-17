@@ -13,7 +13,6 @@ class OBDHandler:
         self.log_callback = log_callback
         self.inter_command_delay = 0.05
 
-        # Store Pro Definitions
         self.pro_defs = {}
 
     def log(self, message):
@@ -28,11 +27,6 @@ class OBDHandler:
         return self.status == "Connected" or self.status == "Connected (SIMULATION)"
 
     def connect(self, port_name=None):
-        """
-        Connects to the car.
-        port_name: Optional string (e.g., "COM3" or "/dev/ttyUSB0").
-                   If None, it will auto-scan.
-        """
         if self.simulation:
             self.log("Attempting connection (SIMULATION)...")
             self.status = "Connected (SIMULATION)"
@@ -42,8 +36,6 @@ class OBDHandler:
         self.log(f"Attempting connection to {port_name if port_name else 'Auto-Scan'}...")
 
         try:
-            # fast=False ensures we initialize protocol slowly/safely
-            # timeout=30 gives the ELM327 time to reset if it was asleep
             if port_name and port_name != "Auto":
                 self.connection = obd.OBD(portstr=port_name, fast=False, timeout=30)
             else:
@@ -75,7 +67,6 @@ class OBDHandler:
         if not self.is_connected(): return None
         if self.simulation: return self._simulate_data(command_key)
 
-        # 1. Standard Command
         if hasattr(obd.commands, command_key):
             cmd = getattr(obd.commands, command_key)
             time.sleep(self.inter_command_delay)
@@ -86,7 +77,6 @@ class OBDHandler:
             except:
                 return None
 
-        # 2. Pro Command
         elif command_key in self.pro_defs:
             return self._query_custom_pid(command_key)
 

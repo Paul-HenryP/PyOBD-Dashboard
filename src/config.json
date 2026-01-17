@@ -1,14 +1,17 @@
 {
-    "log_dir": "C:/Users/User/Downloads",
-    "enabled_packs": [],
+    "log_dir": "C:\\Users\\papaltm\\Documents\\PyOBD-Dashboard\\src\\logs",
+    "enabled_packs": [
+        "BMW\\BMW_E46_320d_M47TU.json"
+    ],
+    "developer_mode": false,
     "sensors": {
         "RPM": {
-            "show": false,
+            "show": true,
             "log": false,
             "limit": "6000"
         },
         "SPEED": {
-            "show": false,
+            "show": true,
             "log": false,
             "limit": "120"
         },
