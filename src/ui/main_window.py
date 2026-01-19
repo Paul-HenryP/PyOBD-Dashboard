@@ -1,4 +1,5 @@
 import customtkinter as ctk
+import json
 import os
 import threading
 import sys
@@ -82,13 +83,11 @@ class DashboardApp(ctk.CTk):
 
     def change_theme(self, new_theme):
         ThemeManager.set_theme(new_theme)
-
         self.configure(fg_color=ThemeManager.get("BACKGROUND"))
 
         if hasattr(self, 'ui_dashboard'):
             self.ui_dashboard.dash_scroll.configure(fg_color=ThemeManager.get("BACKGROUND"))
             self.ui_dashboard.frame_controls.configure(fg_color=ThemeManager.get("BACKGROUND"))
-
 
             self.ui_dashboard.app.btn_connect.configure(
                 fg_color=ThemeManager.get("ACCENT"),
@@ -102,6 +101,11 @@ class DashboardApp(ctk.CTk):
                 button_color=ThemeManager.get("ACCENT_DIM")
             )
 
+            if hasattr(self.ui_dashboard, 'btn_prev'):
+                self.ui_dashboard.btn_prev.configure(fg_color=ThemeManager.get("CARD_BG"))
+                self.ui_dashboard.btn_next.configure(fg_color=ThemeManager.get("CARD_BG"))
+                self.ui_dashboard.lbl_page.configure(text_color=ThemeManager.get("TEXT_MAIN"))
+
         for cmd, state in self.sensor_state.items():
             if state["card_widget"]:
                 state["card_widget"].configure(fg_color=ThemeManager.get("CARD_BG"))
@@ -114,7 +118,6 @@ class DashboardApp(ctk.CTk):
             if title_lbl:
                 title_lbl.configure(text_color=ThemeManager.get("TEXT_MAIN"))
 
-        # 5. Save to Config
         self.config["theme"] = new_theme
         ConfigManager.save_config(self.config)
 
@@ -189,7 +192,7 @@ class DashboardApp(ctk.CTk):
                 "card_widget": card,
                 "widget_value_label": val_lbl,
                 "widget_progress_bar": bar,
-                "widget_title_label": None  # Placeholder
+                "widget_title_label": None
             }
 
     def refresh_dev_mode_visibility(self):
@@ -397,7 +400,7 @@ class DashboardApp(ctk.CTk):
         except:
             pass
         self.destroy()
-        sys.exit(0)
+        os._exit(0)
 
     def update_loop(self):
         if not self.running: return
@@ -428,8 +431,10 @@ class DashboardApp(ctk.CTk):
                     state = self.sensor_state.get(cmd)
                     if state and state["show_var"].get():
                         gauge = state.get("widget_progress_bar")
+
                         if gauge and hasattr(gauge, 'update_value'):
-                            gauge.update_value(val)
+                            if gauge.winfo_ismapped():
+                                gauge.update_value(val)
 
             if self.tabview.get() == "Live Graph":
                 self.ui_graph.update()
