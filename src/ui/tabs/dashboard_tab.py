@@ -46,6 +46,7 @@ class DashboardTab:
         )
         self.app.btn_connect.pack(side="left", padx=20)
 
+        # --- PAGINATION CONTROLS ---
         self.btn_next = ctk.CTkButton(self.frame_controls, text=">", width=40, command=self.next_page,
                                       fg_color=ThemeManager.get("CARD_BG"))
         self.btn_next.pack(side="right", padx=5)
@@ -58,13 +59,18 @@ class DashboardTab:
                                       fg_color=ThemeManager.get("CARD_BG"))
         self.btn_prev.pack(side="right", padx=5)
 
+        # Scrollable Area
         self.dash_scroll = ctk.CTkScrollableFrame(self.frame, fg_color=ThemeManager.get("BACKGROUND"))
         self.dash_scroll.pack(fill="both", expand=True, padx=0, pady=0)
 
     def rebuild_grid(self):
+        for widget in self.dash_scroll.winfo_children():
+            widget.destroy()
+
         for cmd, state in self.app.sensor_state.items():
-            if state["card_widget"]:
-                state["card_widget"].grid_forget()
+            state["card_widget"] = None
+            state["widget_progress_bar"] = None
+            state["widget_value_label"] = None
 
         active_sensors = [k for k, v in self.app.sensor_state.items() if v["show_var"].get()]
 
@@ -73,9 +79,7 @@ class DashboardTab:
         if self.total_pages < 1: self.total_pages = 1
 
         if self.current_page >= self.total_pages:
-            self.current_page = self.total_pages - 1
-        if self.current_page < 0:
-            self.current_page = 0
+            self.current_page = max(0, self.total_pages - 1)
 
         self.lbl_page.configure(text=f"Page {self.current_page + 1}/{self.total_pages}")
 
@@ -89,51 +93,45 @@ class DashboardTab:
             col = i % cols
             state = self.app.sensor_state[cmd]
 
-            container = state["card_widget"]
+            # --- WIDGET CREATION ---
+            try:
+                limit = float(state['limit_var'].get())
+            except:
+                limit = 100
 
-            if container is None:
-                try:
-                    limit = float(state['limit_var'].get())
-                except:
-                    limit = 100
+            container = ctk.CTkFrame(self.dash_scroll, fg_color=ThemeManager.get("CARD_BG"))
 
-                container = ctk.CTkFrame(self.dash_scroll, fg_color=ThemeManager.get("CARD_BG"))
+            display_name = state['name']
+            if len(display_name) > 18:
+                display_name = display_name[:15] + "..."
+            if state['unit']:
+                display_name += f" ({state['unit']})"
 
-                display_name = state['name']
-                if len(display_name) > 18:
-                    display_name = display_name[:15] + "..."
-                if state['unit']:
-                    display_name += f" ({state['unit']})"
+            lbl_title = ctk.CTkLabel(
+                container,
+                text=display_name,
+                font=("Arial", 14, "bold"),
+                text_color=ThemeManager.get("TEXT_MAIN")
+            )
+            lbl_title.pack(pady=(10, 0))
 
-                lbl_title = ctk.CTkLabel(
-                    container,
-                    text=display_name,
-                    font=("Arial", 14, "bold"),
-                    text_color=ThemeManager.get("TEXT_MAIN")
-                )
-                lbl_title.pack(pady=(10, 0))
+            gauge = AnalogGauge(
+                container,
+                width=180,
+                height=180,
+                min_val=0,
+                max_val=limit,
+                unit=state['unit']
+            )
+            gauge.pack(pady=5)
 
-                gauge = AnalogGauge(
-                    container,
-                    width=180,
-                    height=180,
-                    min_val=0,
-                    max_val=limit,
-                    unit=state['unit']
-                )
-                gauge.pack(pady=5)
+            state["card_widget"] = container
+            state["widget_progress_bar"] = gauge
 
-                val_lbl = ctk.CTkLabel(container, text="--", text_color=ThemeManager.get("ACCENT"))
+            tooltip_text = state.get("description", state['name'])
+            ToolTip(container, text=tooltip_text, delay=1000)
 
-                state["card_widget"] = container
-                state["widget_progress_bar"] = gauge
-                state["widget_title_label"] = lbl_title
-                state["widget_value_label"] = val_lbl
-
-                tooltip_text = state.get("description", state['name'])
-                ToolTip(container, text=tooltip_text, delay=1000)
-
-            state["card_widget"].grid(row=row, column=col, padx=10, pady=10, sticky="nsew")
+            container.grid(row=row, column=col, padx=10, pady=10, sticky="nsew")
 
         self.dash_scroll.grid_columnconfigure(0, weight=1)
         self.dash_scroll.grid_columnconfigure(1, weight=1)

@@ -101,6 +101,7 @@ class DashboardApp(ctk.CTk):
                 button_color=ThemeManager.get("ACCENT_DIM")
             )
 
+            # Update Pagination Controls
             if hasattr(self.ui_dashboard, 'btn_prev'):
                 self.ui_dashboard.btn_prev.configure(fg_color=ThemeManager.get("CARD_BG"))
                 self.ui_dashboard.btn_next.configure(fg_color=ThemeManager.get("CARD_BG"))
@@ -133,14 +134,16 @@ class DashboardApp(ctk.CTk):
                     if f.endswith(".json"):
                         full = os.path.join(root, f)
                         rel = os.path.relpath(full, PRO_PACK_DIR)
+
                         match = False
                         for p in enabled_packs:
                             if os.path.normpath(p) == os.path.normpath(rel):
                                 match = True
                                 break
+
                         if match:
                             try:
-                                with open(full, 'r') as json_file:
+                                with open(full, 'r', encoding='utf-8') as json_file:
                                     pro_data = json.load(json_file)
                                     for key, val in pro_data.items():
                                         self.available_sensors[key] = tuple(val[:5])
@@ -176,12 +179,13 @@ class DashboardApp(ctk.CTk):
                 card = old_state[cmd].get("card_widget", None)
                 val_lbl = old_state[cmd].get("widget_value_label", None)
                 bar = old_state[cmd].get("widget_progress_bar", None)
+                title = old_state[cmd].get("widget_title_label", None)
             else:
                 saved = saved_sensors.get(cmd, {})
                 is_show = saved.get("show", def_show)
                 is_log = saved.get("log", def_log)
                 limit_val = str(saved.get("limit", def_limit))
-                card, val_lbl, bar = None, None, None
+                card, val_lbl, bar, title = None, None, None, None
 
             self.sensor_state[cmd] = {
                 "name": name, "unit": unit,
@@ -192,7 +196,7 @@ class DashboardApp(ctk.CTk):
                 "card_widget": card,
                 "widget_value_label": val_lbl,
                 "widget_progress_bar": bar,
-                "widget_title_label": None
+                "widget_title_label": title
             }
 
     def refresh_dev_mode_visibility(self):
@@ -239,41 +243,53 @@ class DashboardApp(ctk.CTk):
             self.ui_graph.app.menu_left.configure(values=options)
             self.ui_graph.app.menu_right.configure(values=options)
 
+    # --- CONNECT BUTTON LOGIC (THREAD SAFE) ---
     def on_connect_click(self):
-        if hasattr(self.ui_dashboard.app, 'btn_connect'):
-            self.ui_dashboard.app.btn_connect.configure(state="disabled", text="Connecting...")
-        threading.Thread(target=self.toggle_connection, daemon=True).start()
+        # 1. Capture values from UI in Main Thread
+        port_selection = self.var_port.get()
+        is_demo = (port_selection == "Demo Mode")
+        target_port = None if port_selection == "Auto" else port_selection
+        if is_demo: target_port = None
 
-    def toggle_connection(self):
+        if hasattr(self.ui_dashboard.app, 'btn_connect'):
+            self.ui_dashboard.app.btn_connect.configure(state="disabled", text="Working...")
+
+        threading.Thread(target=self.bg_connection_task, args=(is_demo, target_port), daemon=True).start()
+
+    def bg_connection_task(self, is_demo, target_port):
+        """Runs in background thread"""
+        connected = False
+
         if self.obd.is_connected():
             self.obd.disconnect()
-            if hasattr(self.ui_dashboard.app, 'btn_connect'):
-                self.ui_dashboard.app.btn_connect.configure(text="CONNECT", fg_color=ThemeManager.get("ACCENT"),
-                                                            state="normal")
+            connected = False
+        else:
+            self.obd.simulation = is_demo
+            connected = self.obd.connect(target_port)
 
-            for cmd in self.sensor_state:
-                bar = self.sensor_state[cmd]['widget_progress_bar']
+        # 4. Schedule UI update back on Main Thread
+        self.after(0, lambda: self.post_connection_update(connected))
+
+    def post_connection_update(self, connected):
+        """Runs on Main Thread after connection attempt"""
+        if hasattr(self.ui_dashboard.app, 'btn_connect'):
+            self.ui_dashboard.app.btn_connect.configure(state="normal")
+
+            if connected:
+                self.ui_dashboard.app.btn_connect.configure(text="DISCONNECT", fg_color=ThemeManager.get("WARNING"))
+
+                # Start Logger
+                log_sensors = [k for k, v in self.sensor_state.items() if v["log_var"].get()]
+                self.logger.start_new_log(log_sensors)
+                self.append_debug_log(f"Connected. Logging {len(log_sensors)} sensors.")
+            else:
+                self.ui_dashboard.app.btn_connect.configure(text="CONNECT", fg_color=ThemeManager.get("ACCENT"))
+
+        if not connected:
+            for cmd, state in self.sensor_state.items():
+                bar = state.get('widget_progress_bar')
                 if bar and hasattr(bar, 'update_value'):
                     bar.update_value(0)
-        else:
-            selected_port = self.var_port.get()
-            if selected_port == "Demo Mode":
-                self.obd.simulation = True
-                target_port = None
-            else:
-                self.obd.simulation = False
-                target_port = None if selected_port == "Auto" else selected_port
-
-            success = self.obd.connect(target_port)
-
-            if hasattr(self.ui_dashboard.app, 'btn_connect'):
-                if success:
-                    self.ui_dashboard.app.btn_connect.configure(text="DISCONNECT", fg_color="red", state="normal")
-                    log_sensors = [k for k, v in self.sensor_state.items() if v["log_var"].get()]
-                    self.logger.start_new_log(log_sensors)
-                    self.append_debug_log(f"Started logging: {len(log_sensors)} sensors.")
-                else:
-                    self.ui_dashboard.app.btn_connect.configure(text="RETRY CONNECT", fg_color="orange", state="normal")
 
     def change_log_folder(self):
         new_dir = filedialog.askdirectory()
@@ -405,96 +421,48 @@ class DashboardApp(ctk.CTk):
     def update_loop(self):
         if not self.running: return
 
-        # 0. Lazy Rebuild (UI Optimization)
         if self.dashboard_dirty and self.tabview.get() == "Dashboard":
             self.ui_dashboard.rebuild_grid()
+            self.dashboard_dirty = False
 
         if self.obd.is_connected():
             data_snapshot = {}
             current_speed = 0
 
-            # --- OPTIMIZATION: INTERLACED POLLING ---
-            # 1. Identify all active sensors
-            active_sensors = []
+            needed_sensors = set(["SPEED", "RPM", "CONTROL_MODULE_VOLTAGE"])
+            needed_sensors.add(self.var_graph_left.get())
+            needed_sensors.add(self.var_graph_right.get())
 
-            # Graph sensors are ALWAYS High Priority
-            graph_left = self.var_graph_left.get()
-            graph_right = self.var_graph_right.get()
-
-            # Gather all sensors the user wants to see/log
             for cmd, state in self.sensor_state.items():
                 if state["show_var"].get() or state["log_var"].get():
-                    active_sensors.append(cmd)
+                    needed_sensors.add(cmd)
 
-            # 2. Split into FAST and SLOW queues
-            # Import priorities here to avoid circular imports at top level if needed,
-            # or ensure constants.py is imported at top of file.
-            from constants import HIGH_PRIORITY_SENSORS
-
-            fast_queue = set()
-            slow_queue = []
-
-            for cmd in active_sensors:
-                if cmd in HIGH_PRIORITY_SENSORS or cmd == graph_left or cmd == graph_right:
-                    fast_queue.add(cmd)
-                else:
-                    slow_queue.append(cmd)
-
-            # 3. Construct the "To Query" list for THIS specific frame
-            # Always query ALL Fast sensors
-            sensors_to_query = list(fast_queue)
-
-            # Add ONE Slow sensor (Round-Robin)
-            # We use a persistent counter to cycle through them
-            if not hasattr(self, '_slow_sensor_index'):
-                self._slow_sensor_index = 0
-
-            if slow_queue:
-                # Wrap around if index is out of bounds
-                if self._slow_sensor_index >= len(slow_queue):
-                    self._slow_sensor_index = 0
-
-                # Add the one lucky slow sensor
-                sensors_to_query.append(slow_queue[self._slow_sensor_index])
-
-                # Increment for next frame
-                self._slow_sensor_index += 1
-
-            # --- EXECUTE QUERIES ---
-            for cmd in sensors_to_query:
+            for cmd in needed_sensors:
                 val = self.obd.query_sensor(cmd)
 
                 if val is not None:
-                    # Update History & Snapshot
                     data_snapshot[cmd] = val
                     self.sensor_history[cmd].append(val)
                     if cmd == "SPEED": current_speed = val
 
-                    # Update UI (Only if visible)
                     state = self.sensor_state.get(cmd)
                     if state and state["show_var"].get():
                         gauge = state.get("widget_progress_bar")
+
                         if gauge and hasattr(gauge, 'update_value'):
                             if gauge.winfo_ismapped():
                                 gauge.update_value(val)
 
-            # --- UPDATE GRAPH ---
             if self.tabview.get() == "Live Graph":
                 self.ui_graph.update()
 
-            # --- SAFETY CHECKS ---
             if hasattr(self.ui_diagnostics.app, 'btn_clear'):
                 if current_speed > 0:
                     self.ui_diagnostics.app.btn_clear.configure(state="disabled", text="MOVING...")
                 else:
                     self.ui_diagnostics.app.btn_clear.configure(state="normal", text="CLEAR CODES")
 
-            # --- LOGGING ---
-            # Note: The logger will write empty strings for sensors not queried in this frame.
-            # This is acceptable for CSVs, or we can cache values.
-            # For simplicity in this optimization, we log what we get.
             self.logger.write_row(data_snapshot)
 
         if self.running:
-            # Run as fast as possible (10ms) because we are now doing less work per frame
-            self.after(10, self.update_loop)
+            self.after(100, self.update_loop)

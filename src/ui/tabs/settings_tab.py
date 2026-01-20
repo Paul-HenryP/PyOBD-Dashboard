@@ -83,17 +83,21 @@ class SettingsTab:
                       command=self.app.refresh_dev_mode_visibility).pack(side="right", padx=20)
 
     def refresh_settings_list(self, choice=None):
-        for widget in self.settings_scroll.winfo_children(): widget.destroy()
+        # 1. Clear existing list
+        for widget in self.settings_scroll.winfo_children():
+            widget.destroy()
 
         target_pack = self.filter_var.get()
         row_idx = 0
 
+        # 2. Filter items
         items_to_show = []
         for cmd, data in self.app.sensor_state.items():
             src = self.app.sensor_sources.get(cmd, "Standard")
             if target_pack == "All (Slow)" or src == target_pack:
                 items_to_show.append((cmd, data))
 
+        # 3. Create Widgets (WITHOUT forcing screen updates in the middle)
         for cmd, data in items_to_show:
             ctk.CTkLabel(self.settings_scroll, text=data["name"], anchor="w").grid(row=row_idx, column=0, sticky="w",
                                                                                    padx=10, pady=2)
@@ -106,7 +110,6 @@ class SettingsTab:
                             command=self.app.mark_dashboard_dirty, width=20).grid(row=row_idx, column=3, padx=15,
                                                                                   pady=2)
             row_idx += 1
-            if row_idx % 20 == 0: self.app.update_idletasks()
 
     def toggle_all(self, type_str, state):
         target_pack = self.filter_var.get()
