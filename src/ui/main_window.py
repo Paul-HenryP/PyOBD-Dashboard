@@ -405,6 +405,7 @@ class DashboardApp(ctk.CTk):
     def update_loop(self):
         if not self.running: return
 
+        # 0. Lazy Rebuild (UI Optimization)
         if self.dashboard_dirty and self.tabview.get() == "Dashboard":
             self.ui_dashboard.rebuild_grid()
 
@@ -412,40 +413,88 @@ class DashboardApp(ctk.CTk):
             data_snapshot = {}
             current_speed = 0
 
-            needed_sensors = set(["SPEED", "RPM", "CONTROL_MODULE_VOLTAGE"])
-            needed_sensors.add(self.var_graph_left.get())
-            needed_sensors.add(self.var_graph_right.get())
+            # --- OPTIMIZATION: INTERLACED POLLING ---
+            # 1. Identify all active sensors
+            active_sensors = []
 
+            # Graph sensors are ALWAYS High Priority
+            graph_left = self.var_graph_left.get()
+            graph_right = self.var_graph_right.get()
+
+            # Gather all sensors the user wants to see/log
             for cmd, state in self.sensor_state.items():
                 if state["show_var"].get() or state["log_var"].get():
-                    needed_sensors.add(cmd)
+                    active_sensors.append(cmd)
 
-            for cmd in needed_sensors:
+            # 2. Split into FAST and SLOW queues
+            # Import priorities here to avoid circular imports at top level if needed,
+            # or ensure constants.py is imported at top of file.
+            from constants import HIGH_PRIORITY_SENSORS
+
+            fast_queue = set()
+            slow_queue = []
+
+            for cmd in active_sensors:
+                if cmd in HIGH_PRIORITY_SENSORS or cmd == graph_left or cmd == graph_right:
+                    fast_queue.add(cmd)
+                else:
+                    slow_queue.append(cmd)
+
+            # 3. Construct the "To Query" list for THIS specific frame
+            # Always query ALL Fast sensors
+            sensors_to_query = list(fast_queue)
+
+            # Add ONE Slow sensor (Round-Robin)
+            # We use a persistent counter to cycle through them
+            if not hasattr(self, '_slow_sensor_index'):
+                self._slow_sensor_index = 0
+
+            if slow_queue:
+                # Wrap around if index is out of bounds
+                if self._slow_sensor_index >= len(slow_queue):
+                    self._slow_sensor_index = 0
+
+                # Add the one lucky slow sensor
+                sensors_to_query.append(slow_queue[self._slow_sensor_index])
+
+                # Increment for next frame
+                self._slow_sensor_index += 1
+
+            # --- EXECUTE QUERIES ---
+            for cmd in sensors_to_query:
                 val = self.obd.query_sensor(cmd)
 
                 if val is not None:
+                    # Update History & Snapshot
                     data_snapshot[cmd] = val
                     self.sensor_history[cmd].append(val)
                     if cmd == "SPEED": current_speed = val
 
+                    # Update UI (Only if visible)
                     state = self.sensor_state.get(cmd)
                     if state and state["show_var"].get():
                         gauge = state.get("widget_progress_bar")
-
                         if gauge and hasattr(gauge, 'update_value'):
                             if gauge.winfo_ismapped():
                                 gauge.update_value(val)
 
+            # --- UPDATE GRAPH ---
             if self.tabview.get() == "Live Graph":
                 self.ui_graph.update()
 
+            # --- SAFETY CHECKS ---
             if hasattr(self.ui_diagnostics.app, 'btn_clear'):
                 if current_speed > 0:
                     self.ui_diagnostics.app.btn_clear.configure(state="disabled", text="MOVING...")
                 else:
                     self.ui_diagnostics.app.btn_clear.configure(state="normal", text="CLEAR CODES")
 
+            # --- LOGGING ---
+            # Note: The logger will write empty strings for sensors not queried in this frame.
+            # This is acceptable for CSVs, or we can cache values.
+            # For simplicity in this optimization, we log what we get.
             self.logger.write_row(data_snapshot)
 
         if self.running:
-            self.after(100, self.update_loop)
+            # Run as fast as possible (10ms) because we are now doing less work per frame
+            self.after(10, self.update_loop)

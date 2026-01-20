@@ -9,7 +9,7 @@ class OBDHandler:
         self.connection = None
         self.status = "Disconnected"
         self.log_callback = log_callback
-        self.inter_command_delay = 0.05
+        self.inter_command_delay = 0.01
 
         self.pro_defs = {}
 
