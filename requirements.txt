@@ -2,3 +2,4 @@ obd
 customtkinter
 pyserial
 matplotlib
+cryptography

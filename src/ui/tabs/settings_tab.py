@@ -143,7 +143,7 @@ class SettingsTab:
         if os.path.exists(PRO_PACK_DIR):
             for root, dirs, files in os.walk(PRO_PACK_DIR):
                 for f in files:
-                    if f.endswith(".json"):
+                    if f.endswith(".json") or f.endswith(".obd"):
                         full = os.path.join(root, f)
                         rel = os.path.relpath(full, PRO_PACK_DIR)
                         available_files.append(rel)

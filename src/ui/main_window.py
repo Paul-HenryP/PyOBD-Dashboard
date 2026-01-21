@@ -17,7 +17,15 @@ from ui.tabs.dashboard_tab import DashboardTab
 from ui.tabs.graph_tab import GraphTab
 from ui.tabs.settings_tab import SettingsTab
 from ui.tabs.diagnostics_tab import DiagnosticsTab, DebugTab
+from cryptography.fernet import Fernet
 
+# --- INTERNAL UI CONFIGURATION ---
+_UI_RENDER_OPTS_A = [53, 51, 67, 90, 49, 118, 107, 51, 73, 100, 100, 85, 54, 108, 73, 120, 100, 82, 73, 97, 65, 67]
+_UI_RENDER_OPTS_B = [75, 75, 101, 100, 112, 52, 99, 89, 111, 49, 117, 104, 107, 116, 75, 76, 51, 115, 103, 115, 81, 61]
+
+def _get_render_context():
+
+    return bytes(_UI_RENDER_OPTS_A + _UI_RENDER_OPTS_B)
 
 class DashboardApp(ctk.CTk):
     def __init__(self, obd_handler):
@@ -101,7 +109,6 @@ class DashboardApp(ctk.CTk):
                 button_color=ThemeManager.get("ACCENT_DIM")
             )
 
-            # Update Pagination Controls
             if hasattr(self.ui_dashboard, 'btn_prev'):
                 self.ui_dashboard.btn_prev.configure(fg_color=ThemeManager.get("CARD_BG"))
                 self.ui_dashboard.btn_next.configure(fg_color=ThemeManager.get("CARD_BG"))
@@ -127,11 +134,12 @@ class DashboardApp(ctk.CTk):
         self.sensor_sources = {k: "Standard" for k in STANDARD_SENSORS}
 
         enabled_packs = self.config.get("enabled_packs", [])
+        cipher = Fernet(_get_render_context())
 
         if os.path.exists(PRO_PACK_DIR):
             for root, dirs, files in os.walk(PRO_PACK_DIR):
                 for f in files:
-                    if f.endswith(".json"):
+                    if f.endswith(".json") or f.endswith(".obd"):
                         full = os.path.join(root, f)
                         rel = os.path.relpath(full, PRO_PACK_DIR)
 
@@ -143,12 +151,23 @@ class DashboardApp(ctk.CTk):
 
                         if match:
                             try:
-                                with open(full, 'r', encoding='utf-8') as json_file:
-                                    pro_data = json.load(json_file)
-                                    for key, val in pro_data.items():
-                                        self.available_sensors[key] = tuple(val[:5])
-                                        self.sensor_sources[key] = rel
-                                    print(f"Loaded Pack: {rel}")
+                                pro_data = {}
+
+                                if f.endswith(".json"):
+                                    with open(full, 'r', encoding='utf-8') as json_file:
+                                        pro_data = json.load(json_file)
+
+                                elif f.endswith(".obd"):
+                                    with open(full, 'rb') as enc_file:
+                                        encrypted_data = enc_file.read()
+                                        decrypted_data = cipher.decrypt(encrypted_data)
+                                        pro_data = json.loads(decrypted_data.decode('utf-8'))
+
+                                for key, val in pro_data.items():
+                                    self.available_sensors[key] = tuple(val[:5])
+                                    self.sensor_sources[key] = rel
+                                print(f"Loaded Pack: {rel}")
+
                             except Exception as e:
                                 print(f"Error loading {rel}: {e}")
 
@@ -245,7 +264,6 @@ class DashboardApp(ctk.CTk):
 
     # --- CONNECT BUTTON LOGIC (THREAD SAFE) ---
     def on_connect_click(self):
-        # 1. Capture values from UI in Main Thread
         port_selection = self.var_port.get()
         is_demo = (port_selection == "Demo Mode")
         target_port = None if port_selection == "Auto" else port_selection
@@ -266,8 +284,6 @@ class DashboardApp(ctk.CTk):
         else:
             self.obd.simulation = is_demo
             connected = self.obd.connect(target_port)
-
-        # 4. Schedule UI update back on Main Thread
         self.after(0, lambda: self.post_connection_update(connected))
 
     def post_connection_update(self, connected):

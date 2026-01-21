@@ -15,3 +15,5 @@ dist/
 
 pro_packs/*.json
 !pro_packs/.gitkeep
+*.obd
+encrypt_packs.py
