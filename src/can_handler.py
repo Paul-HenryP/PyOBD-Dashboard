@@ -90,6 +90,14 @@ class CanHandler:
         while self.is_sniffing and self.ser and self.ser.is_open:
             try:
                 line = self.ser.readline().decode('utf-8', errors='ignore').strip()
+
+                # --- SAFETY MECHANISM: BUFFER PROTECTION ---
+                if "BUFFER FULL" in line:
+                    if self.msg_callback:
+                        self.msg_callback("⚠️ ERROR: ELM327 BUFFER FULL. Stopping. Use a Filter!")
+                    self.is_sniffing = False
+                    break
+
                 if line and self.msg_callback:
                     self.msg_callback(line)
             except Exception:
