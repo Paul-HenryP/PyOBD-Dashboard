@@ -3,15 +3,13 @@ import os
 import json
 from config_manager import ConfigManager
 from constants import PRO_PACK_DIR
-from ui.theme import ThemeManager  # Added import for dynamic themes
-
+from ui.theme import ThemeManager
 
 class SettingsTab:
     def __init__(self, parent_frame, app_instance):
         self.frame = parent_frame
         self.app = app_instance
 
-        # 1. Header Area
         frame_top = ctk.CTkFrame(self.frame, fg_color="transparent")
         frame_top.pack(fill="x", padx=20, pady=10)
 
@@ -49,7 +47,6 @@ class SettingsTab:
                       command=lambda: self.toggle_all("show", False)).pack()
         ctk.CTkLabel(header_frame, text="Show", width=30).pack(side="right")
 
-        # Log All/None
         frame_all_log = ctk.CTkFrame(header_frame, fg_color="transparent")
         frame_all_log.pack(side="right", padx=5)
         ctk.CTkButton(frame_all_log, text="All", width=30, height=15, font=("Arial", 8),
@@ -61,10 +58,9 @@ class SettingsTab:
         ctk.CTkLabel(header_frame, text="Limit", width=80).pack(side="right", padx=5)
         ctk.CTkLabel(header_frame, text="Sensor Name", width=200, anchor="w").pack(side="left", padx=10)
 
-        # 3. Scrollable List
         self.settings_scroll = ctk.CTkScrollableFrame(self.frame)
         self.settings_scroll.pack(fill="both", expand=True, padx=20, pady=5)
-        # Configure Grid Weights
+
         self.settings_scroll.grid_columnconfigure(0, weight=1)
         self.settings_scroll.grid_columnconfigure(1, minsize=80)
         self.settings_scroll.grid_columnconfigure(2, minsize=60)
@@ -72,7 +68,6 @@ class SettingsTab:
 
         self.refresh_settings_list()
 
-        # 4. Footer
         frame_log = ctk.CTkFrame(self.frame)
         frame_log.pack(fill="x", padx=20, pady=20)
         self.app.lbl_path = ctk.CTkLabel(frame_log, text=f"Save Path: {self.app.logger.log_dir}")
@@ -83,21 +78,19 @@ class SettingsTab:
                       command=self.app.refresh_dev_mode_visibility).pack(side="right", padx=20)
 
     def refresh_settings_list(self, choice=None):
-        # 1. Clear existing list
+
         for widget in self.settings_scroll.winfo_children():
             widget.destroy()
 
         target_pack = self.filter_var.get()
         row_idx = 0
 
-        # 2. Filter items
         items_to_show = []
         for cmd, data in self.app.sensor_state.items():
             src = self.app.sensor_sources.get(cmd, "Standard")
             if target_pack == "All (Slow)" or src == target_pack:
                 items_to_show.append((cmd, data))
 
-        # 3. Create Widgets (WITHOUT forcing screen updates in the middle)
         for cmd, data in items_to_show:
             ctk.CTkLabel(self.settings_scroll, text=data["name"], anchor="w").grid(row=row_idx, column=0, sticky="w",
                                                                                    padx=10, pady=2)
@@ -138,7 +131,6 @@ class SettingsTab:
 
         enabled_packs = self.app.config.get("enabled_packs", [])
 
-        # Recursive Search
         available_files = []
         if os.path.exists(PRO_PACK_DIR):
             for root, dirs, files in os.walk(PRO_PACK_DIR):
@@ -171,7 +163,6 @@ class SettingsTab:
             row = ctk.CTkFrame(scroll)
             row.pack(fill="x", pady=2)
 
-            # Normalize Paths
             is_checked = False
             norm_f = os.path.normpath(f)
             for enabled in enabled_packs:

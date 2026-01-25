@@ -1,10 +1,10 @@
 {
-    "log_dir": "C:\\Users\\User\\Desktop\\Python failid\\My Py projects\\PyOBD-Dashboard\\src\\logs",
+    "log_dir": "C:\\Users\\papaltm\\Documents\\PyOBD-Dashboard\\src\\logs",
     "enabled_packs": [
-        "BMW\\BMW_E46_320d_M47.json",
-        "BMW\\BMW_E46_320d_M47TU.json"
+        "Volkswagen\\VW_Sharan_2.0_TDI_DPF.json",
+        "Volkswagen\\VW_TDI_DPF_Tech.json"
     ],
-    "developer_mode": false,
+    "developer_mode": true,
     "theme": "Standard",
     "sensors": {
         "RPM": {
@@ -67,83 +67,43 @@
             "log": false,
             "limit": "0"
         },
-        "BMW_M47_RAIL_PRESSURE": {
-            "show": false,
-            "log": false,
-            "limit": "1400"
-        },
-        "BMW_M47_BOOST_PRESSURE": {
-            "show": false,
-            "log": false,
-            "limit": "2.5"
-        },
-        "BMW_M47_INTAKE_TEMP": {
-            "show": false,
-            "log": false,
-            "limit": "80"
-        },
-        "BMW_M47_MAF": {
-            "show": false,
-            "log": false,
-            "limit": "150"
-        },
-        "BMW_M47_CALCULATED_LOAD": {
-            "show": false,
-            "log": false,
-            "limit": "100"
-        },
-        "BMW_M47_EGR_COMMANDED": {
-            "show": false,
-            "log": false,
-            "limit": "100"
-        },
-        "BMW_M47_EGR_ERROR": {
-            "show": false,
-            "log": false,
-            "limit": "100"
-        },
-        "BMW_M47_INJECTION_TIMING": {
-            "show": false,
-            "log": false,
-            "limit": "20"
-        },
         "BMW_RAIL_PRESSURE": {
-            "show": false,
+            "show": true,
             "log": false,
             "limit": "1600"
         },
         "BMW_BOOST_PRESSURE_ABS": {
-            "show": false,
+            "show": true,
             "log": false,
             "limit": "250"
         },
         "BMW_BOOST_PRESSURE_GAUGE": {
-            "show": false,
+            "show": true,
             "log": false,
             "limit": "1.5"
         },
         "BMW_MAF_GRAMS": {
-            "show": false,
+            "show": true,
             "log": false,
             "limit": "150"
         },
         "BMW_INTAKE_TEMP": {
-            "show": false,
+            "show": true,
             "log": false,
             "limit": "80"
         },
         "BMW_EGR_ERROR": {
-            "show": false,
+            "show": true,
             "log": false,
             "limit": "100"
         },
         "BMW_CALCULATED_LOAD": {
-            "show": false,
+            "show": true,
             "log": false,
             "limit": "100"
         },
         "BMW_TORQUE_ACTUAL": {
-            "show": false,
+            "show": true,
             "log": false,
             "limit": "330"
         }

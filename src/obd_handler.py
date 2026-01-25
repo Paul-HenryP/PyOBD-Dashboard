@@ -1,7 +1,8 @@
 import obd
+from obd.utils import bytes_to_int
 import random
 import time
-
+import re
 
 class OBDHandler:
     def __init__(self, simulation=False, log_callback=None):
@@ -12,6 +13,8 @@ class OBDHandler:
         self.inter_command_delay = 0.01
 
         self.pro_defs = {}
+
+        self.supported_commands = set()
 
         self.sim_start_time = time.time()
         self.sim_speed = 0
@@ -31,7 +34,7 @@ class OBDHandler:
         if self.simulation:
             self.log("Attempting connection (SIMULATION)...")
             self.status = "Connected (SIMULATION)"
-            self.sim_start_time = time.time()  # Reset timer
+            self.sim_start_time = time.time()
             self.log("SUCCESS: Simulation Mode Active")
             return True
 
@@ -47,6 +50,9 @@ class OBDHandler:
                 self.status = "Connected"
                 self.log(f"SUCCESS: Connected to {self.connection.port_name}")
                 self.log(f"Protocol: {self.connection.protocol_name()}")
+
+                self.supported_commands = self.connection.supported_commands
+                self.log(f"Auto-Detected {len(self.supported_commands)} supported sensors.")
                 return True
             else:
                 self.status = "Failed"
@@ -63,7 +69,23 @@ class OBDHandler:
             self.connection.close()
             self.connection = None
         self.status = "Disconnected"
+        self.supported_commands = set()
+
         self.log("Disconnected.")
+
+    def check_supported(self, command_key):
+        """Returns True if the sensor is supported by this specific car"""
+        if self.simulation: return True
+        if not self.is_connected(): return False
+
+        if hasattr(obd.commands, command_key):
+            cmd = getattr(obd.commands, command_key)
+            return cmd in self.supported_commands
+
+        if command_key in self.pro_defs:
+            return True
+
+        return False
 
     def query_sensor(self, command_key):
         if not self.is_connected(): return None
@@ -71,11 +93,20 @@ class OBDHandler:
 
         if hasattr(obd.commands, command_key):
             cmd = getattr(obd.commands, command_key)
+
+            if cmd not in self.supported_commands:
+                return None
+
             time.sleep(self.inter_command_delay)
             try:
                 response = self.connection.query(cmd)
                 if response.is_null(): return None
-                return response.value.magnitude
+
+                val = response.value.magnitude
+
+                if isinstance(val, float):
+                    return round(val, 2)
+                return val
             except:
                 return None
 
@@ -128,9 +159,7 @@ class OBDHandler:
             return None
 
     def _signed(self, val):
-        """Helper for formulas: Convert unsigned byte to signed integer"""
-        if val > 127:
-            return val - 256
+        if val > 127: return val - 256
         return val
 
     def get_dtc(self):
@@ -174,24 +203,12 @@ class OBDHandler:
         return False
 
     def _simulate_data(self, name):
-        """Generates realistic-looking data for testing"""
+        if name == 'RUN_TIME': return int(time.time() - self.sim_start_time)
+        if name == 'BAROMETRIC_PRESSURE': return 101.3
+        if name == 'FUEL_LEVEL': return 75.0
+        if name == 'TIMING_ADVANCE': return random.randint(10, 25)
 
-        # --- 1. PRIORITY LOGIC ---
-        if name == 'RUN_TIME':
-            return int(time.time() - self.sim_start_time)
-
-        if name == 'BAROMETRIC_PRESSURE':
-            return 101 + random.uniform(-0.5, 0.5)  # ~101 kPa (Sea level)
-
-        if name == 'FUEL_LEVEL':
-            return 75.0  # Steady 75%
-
-        if name == 'TIMING_ADVANCE':
-            return random.randint(10, 25)  # Degrees
-
-        # --- 2. PHYSICS SIMULATION ---
         if name == 'SPEED':
-            # Accelerate and Decelerate smoothly
             change = random.randint(-5, 5)
             self.sim_speed += change
             if self.sim_speed < 0: self.sim_speed = 0
@@ -200,27 +217,18 @@ class OBDHandler:
 
         if name == 'RPM':
             if self.sim_speed == 0:
-                return 800 + random.randint(-20, 20)  # Idle
+                return 800 + random.randint(-20, 20)
             else:
                 return (self.sim_speed * 30) + random.randint(0, 200)
 
-        # --- 3. GENERIC RANGES ---
         ranges = {
-            'COOLANT_TEMP': (80, 105),
-            'CONTROL_MODULE_VOLTAGE': (13.8, 14.4),
-            'ENGINE_LOAD': (15, 80),
-            'THROTTLE_POS': (0, 100),
-            'INTAKE_TEMP': (20, 50),
-            'MAF': (2, 50)
+            'COOLANT_TEMP': (80, 105), 'CONTROL_MODULE_VOLTAGE': (13.8, 14.4),
+            'ENGINE_LOAD': (15, 80), 'THROTTLE_POS': (0, 100),
+            'INTAKE_TEMP': (20, 50), 'MAF': (2, 50)
         }
 
         if name in ranges:
             val = random.uniform(*ranges[name])
-
-            if name == 'CONTROL_MODULE_VOLTAGE':
-                return round(val, 2)
-
+            if name == 'CONTROL_MODULE_VOLTAGE': return round(val, 2)
             return int(val) if val > 10 else round(val, 2)
-
-        # Fallback for unknown/Pro sensors
         return random.randint(0, 100)

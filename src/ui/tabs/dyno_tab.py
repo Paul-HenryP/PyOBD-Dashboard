@@ -6,24 +6,20 @@ import time
 from dyno_engine import DynoEngine
 from ui.theme import ThemeManager
 
-
 class DynoTab:
     def __init__(self, parent_frame, app_instance):
         self.frame = parent_frame
         self.app = app_instance
         self.dyno = DynoEngine()
 
-        # Dyno State
         self.is_recording = False
         self.current_weight = 1600
 
-        # Drag Strip State
         self.drag_armed = False
         self.drag_running = False
         self.drag_start_time = 0
         self.drag_best_time = None
 
-        # --- LEFT PANEL (Controls) ---
         self.panel_left = ctk.CTkFrame(self.frame, width=300, fg_color=ThemeManager.get("CARD_BG"))
         self.panel_left.pack(side="left", fill="y", padx=10, pady=10)
 
@@ -39,7 +35,6 @@ class DynoTab:
         self.tab_dyno = self.mode_tabs.add("Dyno")
         self.tab_drag = self.mode_tabs.add("0-100 km/h")
 
-        # --- DYNO UI ---
         ctk.CTkLabel(self.tab_dyno, text="Car Weight (kg):", text_color=ThemeManager.get("TEXT_MAIN")).pack(
             pady=(10, 0))
         self.entry_weight = ctk.CTkEntry(self.tab_dyno, placeholder_text="e.g. 1500")
@@ -63,7 +58,6 @@ class DynoTab:
         )
         self.btn_record.pack(side="bottom", pady=20, padx=10, fill="x")
 
-        # --- DRAG STRIP UI ---
         self.lbl_drag_status = ctk.CTkLabel(self.tab_drag, text="STOP CAR TO ARM", font=("Arial", 16, "bold"),
                                             text_color="gray")
         self.lbl_drag_status.pack(pady=(30, 10))
@@ -78,7 +72,6 @@ class DynoTab:
         ctk.CTkButton(self.tab_drag, text="RESET", fg_color=ThemeManager.get("WARNING"), command=self.reset_drag).pack(
             side="bottom", pady=20)
 
-        # --- RIGHT PANEL (Graph) ---
         self.panel_right = ctk.CTkFrame(self.frame, fg_color=ThemeManager.get("BACKGROUND"))
         self.panel_right.pack(side="right", fill="both", expand=True, padx=10, pady=10)
 
@@ -126,7 +119,6 @@ class DynoTab:
         )
         messagebox.showinfo("Instructions", msg)
 
-    # --- DYNO LOGIC ---
     def toggle_recording(self):
         if self.is_recording:
             self.is_recording = False
@@ -185,11 +177,10 @@ class DynoTab:
             self.lbl_timer.configure(text=f"{elapsed:.2f} s")
 
             if speed >= 100:
-                # FINISH LINE
+
                 self.drag_running = False
                 self.lbl_drag_status.configure(text="FINISHED!", text_color=ThemeManager.get("WARNING"))
 
-                # Check High Score
                 if self.drag_best_time is None or elapsed < self.drag_best_time:
                     self.drag_best_time = elapsed
                     self.lbl_best.configure(text=f"Best: {elapsed:.2f} s")

@@ -1,8 +1,11 @@
+from tkinter import messagebox, filedialog
+
 import customtkinter as ctk
 import json
 import os
 import threading
 import sys
+import time
 from collections import deque, defaultdict
 import serial.tools.list_ports
 import matplotlib.pyplot as plt
@@ -19,16 +22,13 @@ from ui.tabs.graph_tab import GraphTab
 from ui.tabs.settings_tab import SettingsTab
 from ui.tabs.diagnostics_tab import DiagnosticsTab, DebugTab
 from ui.tabs.dyno_tab import DynoTab
-from ui.tabs.help_tab import HelpTab  # <--- RESTORED IMPORT
+from ui.tabs.help_tab import HelpTab
 
-# --- INTERNAL UI CONFIGURATION ---
 _UI_RENDER_OPTS_A = [53, 51, 67, 90, 49, 118, 107, 51, 73, 100, 100, 85, 54, 108, 73, 120, 100, 82, 73, 97, 65, 67]
 _UI_RENDER_OPTS_B = [75, 75, 101, 100, 112, 52, 99, 89, 111, 49, 117, 104, 107, 116, 75, 76, 51, 115, 103, 115, 81, 61]
 
-
 def _get_render_context():
     return bytes(_UI_RENDER_OPTS_A + _UI_RENDER_OPTS_B)
-
 
 class DashboardApp(ctk.CTk):
     def __init__(self, obd_handler):
@@ -51,7 +51,6 @@ class DashboardApp(ctk.CTk):
         self.title("PyOBD Professional - Ultimate Edition")
         self.geometry("1100x800")
 
-        # --- LOAD SAVED THEME ---
         saved_theme = self.config.get("theme", "Cyber")
         ThemeManager.set_theme(saved_theme)
 
@@ -59,7 +58,6 @@ class DashboardApp(ctk.CTk):
         self.configure(fg_color=ThemeManager.get("BACKGROUND"))
         self.protocol("WM_DELETE_WINDOW", self.on_close)
 
-        # Tabs
         self.tabview = ctk.CTkTabview(self)
         self.tabview.pack(fill="both", expand=True, padx=20, pady=20)
 
@@ -68,7 +66,7 @@ class DashboardApp(ctk.CTk):
         self.tab_dyno = self.tabview.add("Dyno")
         self.tab_diag = self.tabview.add("Diagnostics")
         self.tab_settings = self.tabview.add("Settings")
-        self.tab_help = self.tabview.add("Help")  # <--- RESTORED TAB
+        self.tab_help = self.tabview.add("Help")
 
         self.var_dev_mode = ctk.BooleanVar(value=self.config.get("developer_mode", False))
         self.var_port = ctk.StringVar(value="Auto")
@@ -77,13 +75,12 @@ class DashboardApp(ctk.CTk):
 
         self.reload_sensor_definitions()
 
-        # Initialize UI Classes
         self.ui_dashboard = DashboardTab(self.tab_dash, self)
         self.ui_graph = GraphTab(self.tab_graph, self)
         self.ui_dyno = DynoTab(self.tab_dyno, self)
         self.ui_diagnostics = DiagnosticsTab(self.tab_diag, self)
         self.ui_settings = SettingsTab(self.tab_settings, self)
-        self.ui_help = HelpTab(self.tab_help, self)  # <--- RESTORED UI
+        self.ui_help = HelpTab(self.tab_help, self)
 
         self.refresh_dev_mode_visibility()
         self.ui_graph.update()
@@ -266,47 +263,88 @@ class DashboardApp(ctk.CTk):
             self.ui_graph.app.menu_right.configure(values=options)
 
     def on_connect_click(self):
-        if hasattr(self.ui_dashboard.app, 'btn_connect'):
-            self.ui_dashboard.app.btn_connect.configure(state="disabled", text="Connecting...")
-        threading.Thread(target=self.toggle_connection, daemon=True).start()
 
-    def toggle_connection(self):
+        port_selection = self.var_port.get()
+        is_demo = (port_selection == "Demo Mode")
+        target_port = None if port_selection == "Auto" else port_selection
+        if is_demo: target_port = None
+
+        if hasattr(self.ui_dashboard.app, 'btn_connect'):
+            self.ui_dashboard.app.btn_connect.configure(state="disabled", text="Working...")
+
+        threading.Thread(target=self.bg_connection_task, args=(is_demo, target_port), daemon=True).start()
+
+    def bg_connection_task(self, is_demo, target_port):
+        """Runs in background thread"""
+        connected = False
+
         if self.obd.is_connected():
             self.obd.disconnect()
-            if hasattr(self.ui_dashboard.app, 'btn_connect'):
-                self.ui_dashboard.app.btn_connect.configure(text="CONNECT", fg_color=ThemeManager.get("ACCENT"),
-                                                            state="normal")
+            connected = False
+        else:
+            self.obd.simulation = is_demo
+            connected = self.obd.connect(target_port)
 
-            for cmd in self.sensor_state:
-                bar = self.sensor_state[cmd]['widget_progress_bar']
+        self.after(0, lambda: self.post_connection_update(connected))
+
+    def post_connection_update(self, connected):
+        """Runs on Main Thread after connection attempt"""
+        if hasattr(self.ui_dashboard.app, 'btn_connect'):
+            self.ui_dashboard.app.btn_connect.configure(state="normal")
+
+            if connected:
+                self.ui_dashboard.app.btn_connect.configure(text="DISCONNECT", fg_color=ThemeManager.get("WARNING"))
+
+                count_enabled = 0
+                count_supported = 0
+
+                pro_keys = [k for k, src in self.sensor_sources.items() if src != "Standard"]
+
+                critical_standards = ["RPM", "SPEED", "COOLANT_TEMP", "CONTROL_MODULE_VOLTAGE", "FUEL_LEVEL"]
+
+                for cmd, state in self.sensor_state.items():
+
+                    is_supported = self.obd.check_supported(cmd)
+
+                    if is_supported:
+                        count_supported += 1
+
+                        is_pro = cmd in pro_keys
+                        is_critical = cmd in critical_standards
+
+                        if is_pro or is_critical:
+                            state["show_var"].set(True)
+
+                            state["log_var"].set(True if is_pro else False)
+                        else:
+
+                            state["show_var"].set(False)
+                            state["log_var"].set(False)
+                    else:
+
+                        state["show_var"].set(False)
+                        state["log_var"].set(False)
+
+                    if state["show_var"].get():
+                        count_enabled += 1
+
+                self.mark_dashboard_dirty()
+                self.ui_dashboard.rebuild_grid()
+
+                log_sensors = [k for k, v in self.sensor_state.items() if v["log_var"].get()]
+                self.logger.start_new_log(log_sensors)
+
+                self.append_debug_log(f"Connected. Car supports {count_supported} PIDs.")
+                self.append_debug_log(f"Smart Filter enabled {count_enabled} relevant sensors.")
+
+            else:
+                self.ui_dashboard.app.btn_connect.configure(text="CONNECT", fg_color=ThemeManager.get("ACCENT"))
+
+        if not connected:
+            for cmd, state in self.sensor_state.items():
+                bar = state.get('widget_progress_bar')
                 if bar and hasattr(bar, 'update_value'):
                     bar.update_value(0)
-        else:
-            selected_port = self.var_port.get()
-            if selected_port == "Demo Mode":
-                self.obd.simulation = True
-                target_port = None
-            else:
-                self.obd.simulation = False
-                target_port = None if selected_port == "Auto" else selected_port
-
-            success = self.obd.connect(target_port)
-
-            if hasattr(self.ui_dashboard.app, 'btn_connect'):
-                if success:
-                    self.ui_dashboard.app.btn_connect.configure(text="DISCONNECT", fg_color=ThemeManager.get("WARNING"),
-                                                                state="normal")
-                    log_sensors = [k for k, v in self.sensor_state.items() if v["log_var"].get()]
-                    self.logger.start_new_log(log_sensors)
-                    self.append_debug_log(f"Started logging: {len(log_sensors)} sensors.")
-                else:
-                    self.ui_dashboard.app.btn_connect.configure(text="RETRY CONNECT", fg_color="orange", state="normal")
-
-            if not success:
-                for cmd in self.sensor_state:
-                    bar = self.sensor_state[cmd].get('widget_progress_bar')
-                    if bar and hasattr(bar, 'update_value'):
-                        bar.update_value(0)
 
     def change_log_folder(self):
         new_dir = filedialog.askdirectory()

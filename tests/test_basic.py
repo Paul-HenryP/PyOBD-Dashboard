@@ -2,11 +2,10 @@ import unittest
 import time
 from src.obd_handler import OBDHandler
 
-
 class TestOBDLogic(unittest.TestCase):
 
     def setUp(self):
-        # Run in simulation mode for testing
+
         self.handler = OBDHandler(simulation=True)
         self.handler.connect()
 
@@ -26,15 +25,13 @@ class TestOBDLogic(unittest.TestCase):
 
     def test_simulation_smart_logic(self):
         """Test that our specific simulation logic works (not just random numbers)"""
-        # Run Time should be an integer (seconds)
+
         run_time = self.handler.query_sensor("RUN_TIME")
         self.assertIsInstance(run_time, int)
 
-        # Fuel Level should be exactly 75 in our sim logic
         fuel = self.handler.query_sensor("FUEL_LEVEL")
         self.assertEqual(fuel, 75, "Simulation Fuel Level should be fixed at 75")
 
-        # Barometric pressure should be around 101
         baro = self.handler.query_sensor("BAROMETRIC_PRESSURE")
         self.assertAlmostEqual(baro, 101, delta=2, msg="Barometric pressure sim is out of range")
 
@@ -43,14 +40,11 @@ class TestOBDLogic(unittest.TestCase):
         codes = self.handler.get_dtc()
         self.assertIsInstance(codes, list)
         if len(codes) > 0:
-            self.assertEqual(len(codes[0]), 2)  # Should be (Code, Description)
-
-    # --- PRO PACK MATH TESTS ---
+            self.assertEqual(len(codes[0]), 2)
 
     def test_formula_calculation_simple(self):
         """Test basic math: (A * 256) + B"""
-        # Simulate bytes: A=10, B=5
-        # Expected: (10 * 256) + 5 = 2565
+
         data = b'\x0A\x05'
         formula = "(A*256)+B"
         result = self.handler._calculate_formula(formula, data)
@@ -58,7 +52,7 @@ class TestOBDLogic(unittest.TestCase):
 
     def test_formula_calculation_signed(self):
         """Test signed integer logic"""
-        # Byte 255 (0xFF) represents -1 in signed 8-bit
+
         data = b'\xFF'
         formula = "signed(A)"
         result = self.handler._calculate_formula(formula, data)
@@ -68,14 +62,11 @@ class TestOBDLogic(unittest.TestCase):
         """Test that bad formulas do not crash the app"""
         data = b'\x0A'
 
-        # Case 1: Division by Zero
         result = self.handler._calculate_formula("A/0", data)
         self.assertIsNone(result, "Division by zero should return None, not crash")
 
-        # Case 2: Syntax Error
         result = self.handler._calculate_formula("((A*256", data)
         self.assertIsNone(result, "Bad syntax should return None")
-
 
 if __name__ == '__main__':
     unittest.main()

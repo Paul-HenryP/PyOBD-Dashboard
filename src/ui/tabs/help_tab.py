@@ -1,20 +1,16 @@
 import customtkinter as ctk
 from ui.theme import ThemeManager
 
-
 class HelpTab:
     def __init__(self, parent_frame, app_instance):
         self.frame = parent_frame
         self.app = app_instance
 
-        # Scrollable container for text
         self.scroll = ctk.CTkScrollableFrame(self.frame, fg_color="transparent")
         self.scroll.pack(fill="both", expand=True, padx=10, pady=10)
 
-        # --- HEADER ---
         self.add_header("PyOBD User Guide & Safety Protocols")
 
-        # --- SECTION 1: SAFETY ---
         self.add_sub_header("🛡️ ECU Safety Features")
         safety_text = (
             "This application is designed with multiple layers of protection to ensure "
@@ -34,7 +30,6 @@ class HelpTab:
         )
         self.add_text(safety_text)
 
-        # --- SECTION 2: TUTORIAL ---
         self.add_sub_header("🚀 Quick Start Guide")
         tutorial_text = (
             "1. CONNECTION:\n"
@@ -54,7 +49,6 @@ class HelpTab:
         )
         self.add_text(tutorial_text)
 
-        # --- SECTION 3: TROUBLESHOOTING ---
         self.add_sub_header("🔧 Troubleshooting")
         trouble_text = (
             "• 'Interface Found, No Connection to ECU':\n"
@@ -66,7 +60,6 @@ class HelpTab:
         )
         self.add_text(trouble_text)
 
-        # --- DISCLAIMER ---
         ctk.CTkLabel(
             self.scroll,
             text="⚠️ DISCLAIMER: Use at your own risk. Always focus on the road while driving.",
@@ -97,5 +90,6 @@ class HelpTab:
             font=("Arial", 12),
             text_color=ThemeManager.get("TEXT_DIM"),
             justify="left",
-            wraplength=700  # Text wrapping
+            wraplength=700
+
         ).pack(pady=2, anchor="w")

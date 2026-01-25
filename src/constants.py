@@ -1,12 +1,9 @@
 import os
 
-# --- PATH CONFIGURATION ---
 SRC_DIR = os.path.dirname(os.path.abspath(__file__))
 PROJECT_ROOT = os.path.dirname(SRC_DIR)
 PRO_PACK_DIR = os.path.join(PROJECT_ROOT, "pro_packs")
 
-# --- STANDARD (FREE) SENSORS ---
-# Format: "KEY": ("Short Name", "Unit", Show, Log, Limit, "FULL DESCRIPTION")
 STANDARD_SENSORS = {
     "RPM": (
         "Engine RPM", "", True, True, 6000,
@@ -58,9 +55,6 @@ STANDARD_SENSORS = {
     )
 }
 
-# --- PRIORITY LIST (INTERLACED POLLING) ---
-# These sensors will be queried EVERY loop to ensure smooth animation.
-# All other active sensors will be queried one-by-one in a round-robin fashion.
 HIGH_PRIORITY_SENSORS = [
     "RPM",
     "SPEED",
@@ -68,7 +62,6 @@ HIGH_PRIORITY_SENSORS = [
     "ENGINE_LOAD",
     "CONTROL_MODULE_VOLTAGE",
 
-    # Common Pro Pack Performance PIDs (These will be fast if selected)
     "BMW_BOOST_PRESSURE",
     "BMW_RAIL_PRESSURE",
     "F150L_HV_BATTERY_CURRENT",

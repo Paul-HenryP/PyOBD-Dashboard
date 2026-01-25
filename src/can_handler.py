@@ -3,7 +3,6 @@ import threading
 import time
 import random
 
-
 class CanHandler:
     def __init__(self):
         self.ser = None
@@ -91,7 +90,6 @@ class CanHandler:
             try:
                 line = self.ser.readline().decode('utf-8', errors='ignore').strip()
 
-                # --- SAFETY MECHANISM: BUFFER PROTECTION ---
                 if "BUFFER FULL" in line:
                     if self.msg_callback:
                         self.msg_callback("⚠️ ERROR: ELM327 BUFFER FULL. Stopping. Use a Filter!")

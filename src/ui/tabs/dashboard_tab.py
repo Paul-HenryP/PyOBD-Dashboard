@@ -4,7 +4,6 @@ from ui.tooltip import ToolTip
 from ui.theme import ThemeManager
 from ui.widgets.analog_gauge import AnalogGauge
 
-
 class DashboardTab:
     def __init__(self, parent_frame, app_instance):
         self.frame = parent_frame
@@ -46,7 +45,6 @@ class DashboardTab:
         )
         self.app.btn_connect.pack(side="left", padx=20)
 
-        # --- PAGINATION CONTROLS ---
         self.btn_next = ctk.CTkButton(self.frame_controls, text=">", width=40, command=self.next_page,
                                       fg_color=ThemeManager.get("CARD_BG"))
         self.btn_next.pack(side="right", padx=5)
@@ -59,7 +57,6 @@ class DashboardTab:
                                       fg_color=ThemeManager.get("CARD_BG"))
         self.btn_prev.pack(side="right", padx=5)
 
-        # Scrollable Area
         self.dash_scroll = ctk.CTkScrollableFrame(self.frame, fg_color=ThemeManager.get("BACKGROUND"))
         self.dash_scroll.pack(fill="both", expand=True, padx=0, pady=0)
 
@@ -93,7 +90,6 @@ class DashboardTab:
             col = i % cols
             state = self.app.sensor_state[cmd]
 
-            # --- WIDGET CREATION ---
             try:
                 limit = float(state['limit_var'].get())
             except:

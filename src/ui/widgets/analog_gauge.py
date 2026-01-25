@@ -2,7 +2,6 @@ import tkinter as tk
 import customtkinter as ctk
 from ui.theme import ThemeManager
 
-
 class AnalogGauge(ctk.CTkFrame):
     def __init__(self, parent, width=150, height=150, min_val=0, max_val=100, unit=""):
         super().__init__(parent, width=width, height=height, fg_color="transparent")
@@ -26,7 +25,6 @@ class AnalogGauge(ctk.CTkFrame):
         self.arc_start = 135
         self.arc_extent = 270
 
-        # Init drawing elements
         self.bg_arc = self.canvas.create_arc(0, 0, 0, 0, style="arc", width=12)
         self.active_arc = self.canvas.create_arc(0, 0, 0, 0, style="arc", width=12)
         self.text_val = self.canvas.create_text(0, 0, text="--", font=("Arial", 24, "bold"))
@@ -44,7 +42,6 @@ class AnalogGauge(ctk.CTkFrame):
             self.canvas.itemconfigure(self.text_val, fill=ThemeManager.get("ACCENT"))
             self.canvas.itemconfigure(self.text_unit, fill=ThemeManager.get("TEXT_DIM"))
 
-            # Coordinates
             p = self.padding
             s = self.size
 
@@ -77,6 +74,12 @@ class AnalogGauge(ctk.CTkFrame):
                 color = ThemeManager.get("WARNING")
 
             self.canvas.itemconfigure(self.active_arc, extent=angle, outline=color)
-            self.canvas.itemconfigure(self.text_val, text=str(int(value)), fill=color)
+
+            if isinstance(value, float) and abs(value) < 10:
+                text_str = f"{value:.1f}"
+            else:
+                text_str = str(int(value))
+
+            self.canvas.itemconfigure(self.text_val, text=text_str, fill=color)
         except Exception:
             pass

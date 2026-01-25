@@ -3,7 +3,6 @@ import threading
 import time
 import random
 
-
 class CanHandler:
     def __init__(self):
         self.ser = None
@@ -89,7 +88,7 @@ class CanHandler:
     def _sniff_loop(self):
         while self.is_sniffing and self.ser and self.ser.is_open:
             try:
-                # Use errors='ignore' to pass the Garbage Test
+
                 line = self.ser.readline().decode('utf-8', errors='ignore').strip()
                 if line and self.msg_callback:
                     self.msg_callback(line)
@@ -122,7 +121,6 @@ class CanHandler:
         if not input_str: return ""
         clean = "".join([c for c in input_str.upper() if c in "0123456789ABCDEF"])
 
-        # SAFETY: Pad odd lengths (e.g. "A" -> "0A", "123" -> "0123")
         if len(clean) % 2 != 0:
             clean = "0" + clean
 
@@ -130,7 +128,7 @@ class CanHandler:
 
     def inject_frame(self, can_id, data):
         clean_id = self._sanitize_hex(can_id)
-        # Note: Headers (ID) can be 3 chars (11-bit), so we don't pad IDs strictly, just data
+
         if len(clean_id) % 2 != 0 and len(clean_id) < 3:
             clean_id = "0" + clean_id
 
@@ -155,6 +153,6 @@ class CanHandler:
             time.sleep(0.05)
             return self.ser.read_all().decode('utf-8', errors='ignore')
         except Exception:
-            # Handle Cable Pull
+
             self.disconnect()
             return "Error: Hardware Failure"
