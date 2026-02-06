@@ -30,7 +30,7 @@ class OBDHandler:
     def is_connected(self):
         return self.status == "Connected" or self.status == "Connected (SIMULATION)"
 
-    def connect(self, port_name=None):
+    def connect(self, port_name=None, baudrate=115200):
         if self.simulation:
             self.log("Attempting connection (SIMULATION)...")
             self.status = "Connected (SIMULATION)"
@@ -42,9 +42,9 @@ class OBDHandler:
 
         try:
             if port_name and port_name != "Auto":
-                self.connection = obd.OBD(portstr=port_name, fast=False, timeout=30)
+                self.connection = obd.OBD(portstr=port_name, fast=False, timeout=30, baudrate=baudrate)
             else:
-                self.connection = obd.OBD(fast=False, timeout=30)
+                self.connection = obd.OBD(fast=False, timeout=30, baudrate=baudrate)
 
             if self.connection.is_connected():
                 self.status = "Connected"

@@ -274,14 +274,18 @@ class DashboardApp(ctk.CTk):
         port_selection = self.var_port.get()
         is_demo = (port_selection == "Demo Mode")
         target_port = None if port_selection == "Auto" else port_selection
+        try:
+            target_baud_rate = int(self.var_baud.get())
+        except:
+            target_baud_rate = 115200
         if is_demo: target_port = None
 
         if hasattr(self.ui_dashboard.app, 'btn_connect'):
             self.ui_dashboard.app.btn_connect.configure(state="disabled", text="Working...")
 
-        threading.Thread(target=self.bg_connection_task, args=(is_demo, target_port), daemon=True).start()
+        threading.Thread(target=self.bg_connection_task, args=(is_demo, target_port, target_baud_rate), daemon=True).start()
 
-    def bg_connection_task(self, is_demo, target_port):
+    def bg_connection_task(self, is_demo, target_port, target_baud_rate):
         """Runs in background thread"""
         connected = False
 
@@ -290,8 +294,7 @@ class DashboardApp(ctk.CTk):
             connected = False
         else:
             self.obd.simulation = is_demo
-            connected = self.obd.connect(target_port)
-
+            connected = self.obd.connect(target_port, baudrate=target_baud_rate)
         self.after(0, lambda: self.post_connection_update(connected))
 
     def post_connection_update(self, connected):

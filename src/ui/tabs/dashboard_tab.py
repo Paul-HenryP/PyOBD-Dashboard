@@ -16,14 +16,10 @@ class DashboardTab:
         self.frame_controls = ctk.CTkFrame(self.frame, height=50, fg_color=ThemeManager.get("BACKGROUND"))
         self.frame_controls.pack(fill="x", padx=10, pady=5)
 
-        ctk.CTkLabel(
-            self.frame_controls,
-            text="Port:",
-            font=("Arial", 12),
-            text_color=ThemeManager.get("TEXT_MAIN")
-        ).pack(side="left", padx=(10, 5))
+        ctk.CTkLabel(self.frame_controls, text="Port:", font=("Arial", 12),
+                     text_color=ThemeManager.get("TEXT_MAIN")).pack(side="left", padx=(10, 5))
 
-        self.app.var_port = ctk.StringVar(value="Auto")
+        self.app.var_port = getattr(self.app, "var_port", ctk.StringVar(value="Auto"))
 
         self.combo_ports = ctk.CTkComboBox(
             self.frame_controls,
@@ -36,17 +32,33 @@ class DashboardTab:
             button_color=ThemeManager.get("ACCENT_DIM"),
             dropdown_fg_color=ThemeManager.get("CARD_BG"),
             dropdown_text_color=ThemeManager.get("TEXT_MAIN"),
-            dropdown_hover_color=ThemeManager.get("ACCENT_DIM")
+            dropdown_hover_color=ThemeManager.get("ACCENT_DIM"),
         )
         self.combo_ports.pack(side="left", padx=5)
 
-        ctk.CTkButton(
+        ctk.CTkLabel(self.frame_controls, text="Baud:", font=("Arial", 12),
+                     text_color=ThemeManager.get("TEXT_MAIN")).pack(side="left", padx=(10, 5))
+
+        if not hasattr(self.app, "var_baud"):
+            self.app.var_baud = ctk.StringVar(value="115200")
+
+        self.combo_baud = ctk.CTkComboBox(
             self.frame_controls,
-            text="⟳",
-            width=30,
+            variable=self.app.var_baud,
+            values=self._get_baud_values(),
+            width=120,
             fg_color=ThemeManager.get("CARD_BG"),
-            command=self.refresh_ports_ui
-        ).pack(side="left", padx=2)
+            text_color=ThemeManager.get("ACCENT"),
+            border_color=ThemeManager.get("ACCENT_DIM"),
+            button_color=ThemeManager.get("ACCENT_DIM"),
+            dropdown_fg_color=ThemeManager.get("CARD_BG"),
+            dropdown_text_color=ThemeManager.get("TEXT_MAIN"),
+            dropdown_hover_color=ThemeManager.get("ACCENT_DIM"),
+        )
+        self.combo_baud.pack(side="left", padx=5)
+
+        ctk.CTkButton(self.frame_controls, text="⟳", width=30, fg_color=ThemeManager.get("CARD_BG"),
+                      command=self.refresh_ports_ui).pack(side="left", padx=2)
 
         self.app.btn_connect = ctk.CTkButton(
             self.frame_controls,
@@ -89,14 +101,45 @@ class DashboardTab:
                 out.append(v)
         return out
 
+    def _get_baud_values(self):
+        values = ["9600", "38400", "115200", "230400"]
+        cur = ""
+        try:
+            cur = str(self.app.var_baud.get() or "")
+        except:
+            cur = ""
+        if cur and cur not in values:
+            values = [cur] + values
+        return values
+
     def refresh_ports_ui(self):
-        typed = self.app.var_port.get()
-        values = self._get_ports_values()
-        self.combo_ports.configure(values=values)
-        if typed:
-            self.app.var_port.set(typed)
-        elif values:
-            self.app.var_port.set(values[0])
+        typed_port = ""
+        typed_baud = ""
+        try:
+            typed_port = self.app.var_port.get()
+        except:
+            typed_port = ""
+        try:
+            typed_baud = self.app.var_baud.get()
+        except:
+            typed_baud = ""
+
+        port_values = self._get_ports_values()
+        self.combo_ports.configure(values=port_values)
+
+        baud_values = self._get_baud_values()
+        self.combo_baud.configure(values=baud_values)
+
+        if typed_port:
+            self.app.var_port.set(typed_port)
+        elif port_values:
+            self.app.var_port.set(port_values[0])
+
+        if typed_baud:
+            self.app.var_baud.set(typed_baud)
+        elif baud_values:
+            self.app.var_baud.set(baud_values[0])
+
         if hasattr(self.app, "refresh_ports") and callable(self.app.refresh_ports):
             try:
                 self.app.refresh_ports()
