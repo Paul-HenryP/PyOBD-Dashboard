@@ -30,6 +30,12 @@ _UI_RENDER_OPTS_B = [75, 75, 101, 100, 112, 52, 99, 89, 111, 49, 117, 104, 107, 
 def _get_render_context():
     return bytes(_UI_RENDER_OPTS_A + _UI_RENDER_OPTS_B)
 
+def window_ensure_show_and_focus(root):
+    root.lift()
+    root.focus_force()
+    root.attributes("-topmost", True)
+    root.after(0, lambda: root.attributes("-topmost", False))
+
 class DashboardApp(ctk.CTk):
     def __init__(self, obd_handler):
         super().__init__()
@@ -50,6 +56,7 @@ class DashboardApp(ctk.CTk):
 
         self.title("PyOBD Professional - Ultimate Edition")
         self.geometry("1100x800")
+        window_ensure_show_and_focus(self)
 
         saved_theme = self.config.get("theme", "Cyber")
         ThemeManager.set_theme(saved_theme)
