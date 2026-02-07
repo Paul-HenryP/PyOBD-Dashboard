@@ -115,6 +115,7 @@ class DashboardTab:
     def refresh_ports_ui(self):
         typed_port = ""
         typed_baud = ""
+
         try:
             typed_port = self.app.var_port.get()
         except:
