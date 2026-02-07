@@ -30,6 +30,12 @@ _UI_RENDER_OPTS_B = [75, 75, 101, 100, 112, 52, 99, 89, 111, 49, 117, 104, 107, 
 def _get_render_context():
     return bytes(_UI_RENDER_OPTS_A + _UI_RENDER_OPTS_B)
 
+def window_ensure_show_and_focus(root):
+    root.lift()
+    root.focus_force()
+    root.attributes("-topmost", True)
+    root.after(0, lambda: root.attributes("-topmost", False))
+
 class DashboardApp(ctk.CTk):
     def __init__(self, obd_handler):
         super().__init__()
@@ -50,6 +56,7 @@ class DashboardApp(ctk.CTk):
 
         self.title("PyOBD Professional - Ultimate Edition")
         self.geometry("1100x800")
+        window_ensure_show_and_focus(self)
 
         saved_theme = self.config.get("theme", "Cyber")
         ThemeManager.set_theme(saved_theme)
@@ -69,7 +76,8 @@ class DashboardApp(ctk.CTk):
         self.tab_help = self.tabview.add("Help")
 
         self.var_dev_mode = ctk.BooleanVar(value=self.config.get("developer_mode", False))
-        self.var_port = ctk.StringVar(value="Auto")
+        self.var_port = ctk.StringVar(value=self.config.get("port", "Auto"))
+        self.var_baud = ctk.StringVar(value=self.config.get("baud_rate", "38400"))
         self.var_graph_left = ctk.StringVar(value="RPM")
         self.var_graph_right = ctk.StringVar(value="SPEED")
 
@@ -267,14 +275,18 @@ class DashboardApp(ctk.CTk):
         port_selection = self.var_port.get()
         is_demo = (port_selection == "Demo Mode")
         target_port = None if port_selection == "Auto" else port_selection
+        try:
+            target_baud_rate = int(self.var_baud.get())
+        except:
+            target_baud_rate = 115200
         if is_demo: target_port = None
 
         if hasattr(self.ui_dashboard.app, 'btn_connect'):
             self.ui_dashboard.app.btn_connect.configure(state="disabled", text="Working...")
 
-        threading.Thread(target=self.bg_connection_task, args=(is_demo, target_port), daemon=True).start()
+        threading.Thread(target=self.bg_connection_task, args=(is_demo, target_port, target_baud_rate), daemon=True).start()
 
-    def bg_connection_task(self, is_demo, target_port):
+    def bg_connection_task(self, is_demo, target_port, target_baud_rate):
         """Runs in background thread"""
         connected = False
 
@@ -283,8 +295,7 @@ class DashboardApp(ctk.CTk):
             connected = False
         else:
             self.obd.simulation = is_demo
-            connected = self.obd.connect(target_port)
-
+            connected = self.obd.connect(target_port, baudrate=target_baud_rate)
         self.after(0, lambda: self.post_connection_update(connected))
 
     def post_connection_update(self, connected):
@@ -459,7 +470,9 @@ class DashboardApp(ctk.CTk):
             "enabled_packs": self.config.get("enabled_packs", []),
             "developer_mode": self.var_dev_mode.get(),
             "theme": self.config.get("theme", "Cyber"),
-            "sensors": {}
+            "sensors": {},
+            "port": self.var_port.get(),
+            "baud_rate": self.var_baud.get(),
         }
         for cmd, state in self.sensor_state.items():
             data_to_save["sensors"][cmd] = {"show": state["show_var"].get(), "log": state["log_var"].get(),
