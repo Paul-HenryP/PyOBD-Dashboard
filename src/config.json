@@ -28,22 +28,22 @@
             "limit": "15"
         },
         "ENGINE_LOAD": {
-            "show": true,
+            "show": false,
             "log": false,
             "limit": "90"
         },
         "THROTTLE_POS": {
-            "show": true,
+            "show": false,
             "log": false,
             "limit": "100"
         },
         "INTAKE_TEMP": {
-            "show": true,
+            "show": false,
             "log": false,
             "limit": "60"
         },
         "MAF": {
-            "show": true,
+            "show": false,
             "log": false,
             "limit": "100"
         },
@@ -53,59 +53,94 @@
             "limit": "0"
         },
         "BAROMETRIC_PRESSURE": {
-            "show": true,
+            "show": false,
             "log": false,
             "limit": "0"
         },
         "TIMING_ADVANCE": {
-            "show": true,
+            "show": false,
             "log": false,
             "limit": "0"
         },
         "RUN_TIME": {
-            "show": true,
+            "show": false,
             "log": false,
             "limit": "0"
         },
-        "BMW_RAIL_PRESSURE": {
+        "VW_DPF_SOOT_CALC": {
             "show": true,
-            "log": false,
-            "limit": "1600"
+            "log": true,
+            "limit": "24"
         },
-        "BMW_BOOST_PRESSURE_ABS": {
+        "VW_DPF_SOOT_MEAS": {
             "show": true,
-            "log": false,
-            "limit": "250"
+            "log": true,
+            "limit": "24"
         },
-        "BMW_BOOST_PRESSURE_GAUGE": {
+        "VW_FUEL_LEVEL_LITERS": {
             "show": true,
-            "log": false,
-            "limit": "1.5"
+            "log": true,
+            "limit": "70"
         },
-        "BMW_MAF_GRAMS": {
+        "VW_OIL_TEMP": {
             "show": true,
-            "log": false,
-            "limit": "150"
+            "log": true,
+            "limit": "130"
         },
-        "BMW_INTAKE_TEMP": {
+        "VW_EXHAUST_TEMP": {
             "show": true,
-            "log": false,
+            "log": true,
+            "limit": "900"
+        },
+        "VW_BOOST_PRESSURE_BAR": {
+            "show": true,
+            "log": true,
+            "limit": "2.5"
+        },
+        "VW_AMBIENT_PRESSURE": {
+            "show": true,
+            "log": true,
+            "limit": "1100"
+        },
+        "VAG_DPF_SOOT_CALC": {
+            "show": true,
+            "log": true,
+            "limit": "24"
+        },
+        "VAG_DPF_SOOT_MEAS": {
+            "show": true,
+            "log": true,
+            "limit": "24"
+        },
+        "VAG_DPF_OIL_ASH": {
+            "show": true,
+            "log": true,
             "limit": "80"
         },
-        "BMW_EGR_ERROR": {
+        "VAG_KILOMETERS_SINCE_REGEN": {
             "show": true,
-            "log": false,
-            "limit": "100"
+            "log": true,
+            "limit": "1000"
         },
-        "BMW_CALCULATED_LOAD": {
+        "VAG_EXHAUST_TEMP_TURBO": {
             "show": true,
-            "log": false,
-            "limit": "100"
+            "log": true,
+            "limit": "850"
         },
-        "BMW_TORQUE_ACTUAL": {
+        "VAG_EXHAUST_TEMP_DPF_IN": {
             "show": true,
-            "log": false,
-            "limit": "330"
+            "log": true,
+            "limit": "850"
+        },
+        "VAG_DIFFERENTIAL_PRESSURE": {
+            "show": true,
+            "log": true,
+            "limit": "300"
+        },
+        "VAG_OIL_TEMP": {
+            "show": true,
+            "log": true,
+            "limit": "130"
         }
     }
 }

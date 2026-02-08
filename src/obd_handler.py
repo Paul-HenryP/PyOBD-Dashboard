@@ -163,13 +163,63 @@ class OBDHandler:
         return val
 
     def get_dtc(self):
-        if not self.is_connected(): return []
-        self.log("Querying DTCs...")
-        if self.simulation: return [("P0300", "Random/Multiple Cylinder Misfire")]
+        """
+        Performs a Deep Scan and returns specific categories.
+        Returns a Dictionary: {'Category Name': [(Code, Description), ...]}
+        """
+        if not self.is_connected(): return {}
 
-        time.sleep(0.2)
-        res = self.connection.query(obd.commands.GET_DTC)
-        return res.value if not res.is_null() else []
+        self.log("Starting Deep DTC Scan...")
+
+        dtc_groups = {
+            "ENGINE - CONFIRMED (Permanent)": [],
+            "ENGINE - PENDING (Intermittent)": [],
+            "TRANSMISSION (TCU)": []
+        }
+
+        if self.simulation:
+            return {
+                "ENGINE - CONFIRMED (Permanent)": [("P0300", "Random Misfire")],
+                "ENGINE - PENDING (Intermittent)": [("P0171", "System Too Lean")],
+                "TRANSMISSION (TCU)": []
+            }
+
+        try:
+            # --- 1. SCAN ENGINE (7E0) ---
+            self.log("Scanning Engine...")
+            self.connection.query(obd.commands.AT.SH + "7E0")
+
+            # Confirmed (Mode 03)
+            res_confirmed = self.connection.query(obd.commands.GET_DTC)
+            if not res_confirmed.is_null() and res_confirmed.value:
+                for code in res_confirmed.value:
+                    dtc_groups["ENGINE - CONFIRMED (Permanent)"].append(code)
+
+            # Pending (Mode 07)
+            res_pending = self.connection.query(obd.commands.GET_CURRENT_DTC)
+            if not res_pending.is_null() and res_pending.value:
+                for code in res_pending.value:
+                    dtc_groups["ENGINE - PENDING (Intermittent)"].append(code)
+
+            # --- 2. SCAN TRANSMISSION (7E1 / 7E2) ---
+            for target in ["7E1", "7E2"]:
+                self.log(f"Scanning Transmission ({target})...")
+                self.connection.query(obd.commands.AT.SH + target)
+                time.sleep(0.1)
+
+                res_tcu = self.connection.query(obd.commands.GET_DTC)
+
+                if not res_tcu.is_null() and res_tcu.value:
+                    for code in res_tcu.value:
+                        dtc_groups["TRANSMISSION (TCU)"].append(code)
+
+        except Exception as e:
+            self.log(f"Scan Error: {e}")
+        finally:
+            self.connection.query(obd.commands.AT.SH + "7E0")
+
+        self.log("Scan Complete.")
+        return dtc_groups
 
     def get_freeze_frame_snapshot(self, sensor_list):
         self.log("Reading Freeze Frame Data...")

@@ -399,18 +399,32 @@ class DashboardApp(ctk.CTk):
             return
 
         self.ui_diagnostics.app.txt_dtc.delete("1.0", "end")
-        self.ui_diagnostics.app.txt_dtc.insert("end", "Scanning...\n")
+        self.ui_diagnostics.app.txt_dtc.insert("end",
+                                               "Scanning all modules (Engine, Transmission, Pending)...\nThis may take a few seconds.\n")
         self.update()
 
-        codes = self.obd.get_dtc()
-        self.ui_diagnostics.app.txt_dtc.delete("1.0", "end")
-        if not codes:
-            self.ui_diagnostics.app.txt_dtc.insert("end", "No Fault Codes Found (Green Light!)")
-        else:
-            self.ui_diagnostics.app.txt_dtc.insert("end", f"Found {len(codes)} Faults:\n", "bold")
-            for c in codes:
-                self.ui_diagnostics.app.txt_dtc.insert("end", f"• {c[0]}: {c[1]}\n")
+        dtc_groups = self.obd.get_dtc()
 
+        self.ui_diagnostics.app.txt_dtc.delete("1.0", "end")
+
+        total_faults = 0
+        found_any = False
+
+        for category, codes in dtc_groups.items():
+            if len(codes) > 0:
+                found_any = True
+                total_faults += len(codes)
+
+                self.ui_diagnostics.app.txt_dtc.insert("end", f"\n--- {category} ---\n", "bold")
+
+                for c in codes:
+                    self.ui_diagnostics.app.txt_dtc.insert("end", f" • {c[0]}: {c[1]}\n")
+
+        if not found_any:
+            self.ui_diagnostics.app.txt_dtc.insert("end",
+                                                   "\n✅ No Fault Codes Found in any module.\n(Engine, Transmission, and Pending checks passed)")
+        else:
+            self.ui_diagnostics.app.txt_dtc.insert("end", f"\n⚠️ Scan Finished. Found {total_faults} issues total.")
     def perform_full_backup(self):
         if not self.obd.is_connected(): messagebox.showerror("Error", "Connect to car first!"); return
         if hasattr(self.ui_diagnostics.app, 'txt_dtc'):
