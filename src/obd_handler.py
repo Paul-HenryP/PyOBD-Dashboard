@@ -86,7 +86,6 @@ class OBDHandler:
         return False
 
     def _set_header(self, header_hex):
-        """Manually sends an AT SH command to the ELM327"""
         if not header_hex: return
         try:
             cmd = OBDCommand("SET_HEADER", "AT SH " + header_hex, b"", lambda m: m)
@@ -139,7 +138,6 @@ class OBDHandler:
             pid = pid_hex[2:]
 
             cmd = OBDCommand("CUSTOM_PID", mode + pid, b"", lambda m: m)
-
             raw_response = self.connection.query(cmd, force=True)
 
             if raw_response.is_null(): return None
@@ -170,58 +168,101 @@ class OBDHandler:
         if val > 127: return val - 256
         return val
 
-    def get_dtc(self):
-        """
-        Performs a Deep Scan (Engine + Pending + TCU).
-        """
-        if not self.is_connected(): return {}
+    def _decode_uds_dtc(self, byte1, byte2, byte3):
+        """Converts 3-byte UDS hex to standard P/U/B/C code"""
 
+        type_bits = (byte1 & 0xC0) >> 6
+        prefix = {0: "P", 1: "C", 2: "B", 3: "U"}[type_bits]
+
+        second_char = (byte1 & 0x30) >> 4
+
+        rest_of_byte1 = byte1 & 0x0F
+
+        hex_code = f"{prefix}{second_char}{rest_of_byte1:X}{byte2:02X}{byte3:02X}"
+        return hex_code.upper()
+
+    def _get_uds_dtcs(self, target_header="7E0"):
+        """EXPERIMENTAL: Scan for UDS Service 19 faults"""
+        codes = []
+        try:
+            self.log(f"Attempting UDS (Service 19) Scan on {target_header}...")
+            self._set_header(target_header)
+            time.sleep(0.1)
+
+            cmd = OBDCommand("UDS_SCAN", "19 02 FF", b"", lambda m: m)
+            response = self.connection.query(cmd, force=True)
+
+            if not response.is_null() and response.messages:
+                data = response.messages[0].data
+
+                if len(data) > 0 and data[0] == 0x59:
+                    self.log(f"UDS RAW DATA: {data.hex()}")
+
+                    i = 3
+                    while i + 3 < len(data):
+                        b1 = data[i]
+                        b2 = data[i + 1]
+                        b3 = data[i + 2]
+                        status = data[i + 3]
+
+                        if status & 0x09:  # 0x01 (Current) or 0x08 (Confirmed)
+                            code_str = self._decode_uds_dtc(b1, b2, b3)
+                            codes.append((code_str, f"UDS Extended (Status: {status:02X})"))
+
+                        i += 4
+                elif len(data) > 0 and data[0] == 0x7F:
+                    self.log(f"UDS Not Supported by this module (Response: {data.hex()})")
+            else:
+                self.log("No response to UDS Scan.")
+
+        except Exception as e:
+            self.log(f"UDS Logic Error: {e}")
+
+        return codes
+
+    def get_dtc(self):
+        if not self.is_connected(): return {}
         self.log("Starting Deep DTC Scan...")
 
         dtc_groups = {
-            "ENGINE - CONFIRMED (Permanent)": [],
-            "ENGINE - PENDING (Intermittent)": [],
-            "TRANSMISSION (TCU)": []
+            "ENGINE - CONFIRMED": [],
+            "ENGINE - PENDING": [],
+            "UDS / EXTENDED (Experimental)": [],
+
+            "TRANSMISSION": []
         }
 
         if self.simulation:
-            return {
-                "ENGINE - CONFIRMED (Permanent)": [("P0300", "Random Misfire")],
-                "ENGINE - PENDING (Intermittent)": [("P0171", "System Too Lean")],
-                "TRANSMISSION (TCU)": []
-            }
+            return {"ENGINE - CONFIRMED": [("P0300", "Random Misfire")]}
 
         try:
 
-            self.log("Scanning Engine...")
+            self.log("Scanning Engine (Standard)...")
             self._set_header("7E0")
-            time.sleep(0.2)
 
-            res_confirmed = self.connection.query(obd.commands.GET_DTC, force=True)
-            if not res_confirmed.is_null() and res_confirmed.value:
-                for code in res_confirmed.value:
-                    dtc_groups["ENGINE - CONFIRMED (Permanent)"].append(code)
+            res_conf = self.connection.query(obd.commands.GET_DTC, force=True)
+            if not res_conf.is_null() and res_conf.value:
+                for c in res_conf.value: dtc_groups["ENGINE - CONFIRMED"].append(c)
 
-            res_pending = self.connection.query(obd.commands.GET_CURRENT_DTC, force=True)
-            if not res_pending.is_null() and res_pending.value:
-                for code in res_pending.value:
-                    dtc_groups["ENGINE - PENDING (Intermittent)"].append(code)
+            res_pend = self.connection.query(obd.commands.GET_CURRENT_DTC, force=True)
+            if not res_pend.is_null() and res_pend.value:
+                for c in res_pend.value: dtc_groups["ENGINE - PENDING"].append(c)
 
-            for target in ["7E1", "7E2"]:
-                self.log(f"Scanning Transmission ({target})...")
-                self._set_header(target)
-                time.sleep(0.3)
+            uds_codes = self._get_uds_dtcs("7E0")
+            for c in uds_codes:
 
-                res_tcu = self.connection.query(obd.commands.GET_DTC, force=True)
+                is_duplicate = any(existing[0] == c[0] for existing in dtc_groups["ENGINE - CONFIRMED"])
+                if not is_duplicate:
+                    dtc_groups["UDS / EXTENDED (Experimental)"].append(c)
 
-                if not res_tcu.is_null() and res_tcu.value:
-                    for code in res_tcu.value:
-
-                        if code not in dtc_groups["ENGINE - CONFIRMED (Permanent)"]:
-                            dtc_groups["TRANSMISSION (TCU)"].append(code)
+            self.log("Scanning Trans (Standard)...")
+            self._set_header("7E1")
+            res_tcu = self.connection.query(obd.commands.GET_DTC, force=True)
+            if not res_tcu.is_null() and res_tcu.value:
+                for c in res_tcu.value: dtc_groups["TRANSMISSION"].append(c)
 
         except Exception as e:
-            self.log(f"Scan Error: {e}")
+            self.log(f"Scan Critical Error: {e}")
         finally:
             self._set_header("7E0")
 
@@ -229,19 +270,14 @@ class OBDHandler:
         return dtc_groups
 
     def get_freeze_frame_snapshot(self, sensor_list):
-        """Reads current values for all sensors to save a snapshot."""
         self.log("Reading Freeze Frame Data...")
         snapshot = {}
-
         if self.simulation:
-
-            for name in sensor_list:
-                snapshot[name] = self._simulate_data(name)
+            for name in sensor_list: snapshot[name] = self._simulate_data(name)
             return snapshot
 
         if self.connection and self.connection.is_connected():
             for name in sensor_list:
-
                 val = self.query_sensor(name)
                 if val is not None:
                     snapshot[name] = val
@@ -251,7 +287,6 @@ class OBDHandler:
         self.log("Attempting to Clear DTCs...")
         if self.simulation:
             time.sleep(1)
-            self.log("SIMULATION: Codes Cleared.")
             return True
 
         if self.connection and self.connection.is_connected():
@@ -259,11 +294,10 @@ class OBDHandler:
 
                 self._set_header("7E0")
                 self.connection.query(obd.commands.CLEAR_DTC)
+
                 self._set_header("7E1")
                 self.connection.query(obd.commands.CLEAR_DTC)
-
                 self._set_header("7E0")
-
                 self.log("Command Sent: CLEAR_DTC")
                 return True
             except Exception as e:
@@ -276,19 +310,8 @@ class OBDHandler:
         if name == 'BAROMETRIC_PRESSURE': return 101.3
         if name == 'FUEL_LEVEL': return 75.0
         if name == 'TIMING_ADVANCE': return random.randint(10, 25)
-
-        if name == 'SPEED':
-            change = random.randint(-5, 5)
-            self.sim_speed += change
-            if self.sim_speed < 0: self.sim_speed = 0
-            if self.sim_speed > 160: self.sim_speed = 160
-            return self.sim_speed
-
-        if name == 'RPM':
-            if self.sim_speed == 0:
-                return 800 + random.randint(-20, 20)
-            else:
-                return (self.sim_speed * 30) + random.randint(0, 200)
+        if name == 'SPEED': return random.randint(0, 120)
+        if name == 'RPM': return 800 + random.randint(0, 500)
 
         ranges = {
             'COOLANT_TEMP': (80, 105), 'CONTROL_MODULE_VOLTAGE': (13.8, 14.4),
