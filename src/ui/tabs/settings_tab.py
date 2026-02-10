@@ -49,6 +49,16 @@ class SettingsTab:
         self.sim_location = None
 
         self.var_lang = ctk.StringVar(value=self.app.config.get("lang", "en"))
+        combo_lang_label = ctk.CTkLabel(frame_top, text=translate("ui_tab_settings_language"), font=("Arial", 12))
+        self.combo_lang = ctk.CTkOptionMenu(
+            frame_top,
+            variable=self.var_lang,
+            values=get_available_languages(),
+            command=lambda l: (set_language(l), self.app.config.update({"lang": l}), ConfigManager.save_config(self.app.config)),
+            width=70,
+        )
+        combo_lang_label.pack(side="left", padx=5)
+        self.combo_lang.pack(side="left", padx=5)
 
         self.filter_var = ctk.StringVar(value="Standard")
         ctk.CTkLabel(frame_top, text=translate("ui_tab_settings_show_pack"), font=("Arial", 12)).pack(side="left", padx=5)
@@ -68,7 +78,7 @@ class SettingsTab:
             command=self.open_pack_manager,
         ).pack(side="right")
 
-        ctk.CTkLabel(frame_top, text=translate("ui_tab_settings_theme"), font=("Arial", 12)).pack(side="right", padx=5)
+        combo_theme_label = ctk.CTkLabel(frame_top, text=translate("ui_tab_settings_theme"), font=("Arial", 12))
         self.var_theme = ctk.StringVar(value=self.app.config.get("theme", "Cyber"))
 
         theme_names = sorted(list(ThemeManager.THEMES.keys()))
@@ -81,6 +91,7 @@ class SettingsTab:
             width=130,
         )
         self.combo_theme.pack(side="right", padx=5)
+        combo_theme_label.pack(side="right", padx=5)
 
         header_frame = ctk.CTkFrame(self.frame, fg_color="#404040")
         header_frame.pack(fill="x", padx=20)
@@ -154,16 +165,6 @@ class SettingsTab:
             variable=self.app.var_dev_mode,
             command=self.app.refresh_dev_mode_visibility,
         ).pack(side="right", padx=20)
-
-        ctk.CTkLabel(frame_top, text=translate("ui_tab_settings_language"), font=("Arial", 12)).pack(side="left", padx=5)
-        self.combo_lang = ctk.CTkOptionMenu(
-            frame_top,
-            variable=self.var_lang,
-            values=get_available_languages(),
-            command=lambda l: (set_language(l), self.app.config.update({"lang": l}), ConfigManager.save_config(self.app.config)),
-            width=70,
-        )
-        self.combo_lang.pack(side="right", padx=5)
 
     def _build_sim_section(self):
         sim = ctk.CTkFrame(self.frame)
