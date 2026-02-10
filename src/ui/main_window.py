@@ -100,7 +100,7 @@ class DashboardApp(ctk.CTk):
         if "log_dir" in self.config:
             self.logger.set_directory(self.config["log_dir"])
             if hasattr(self, 'lbl_path'):
-                self.lbl_path.configure(text=f"Save Path: {self.logger.log_dir}")
+                self.lbl_path.configure(text=translate("ui_main_window_settings_log_save_path").format(self.logger.log_dir))
 
         self.ui_dashboard.rebuild_grid()
         self.update_loop()
