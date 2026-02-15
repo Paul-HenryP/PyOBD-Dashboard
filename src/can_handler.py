@@ -14,7 +14,7 @@ class CanHandler:
         self.sim_ids = ["290", "1C0", "4B1", "350", "7E8"]
         self.sim_data = {id: [0] * 8 for id in self.sim_ids}
 
-    def connect(self, port_name):
+    def connect(self, port_name, baudrate=38400):
         if port_name == "Demo Mode":
             self.simulation = True
             return True
@@ -27,7 +27,7 @@ class CanHandler:
                 except:
                     pass
 
-            self.ser = serial.Serial(port_name, 38400, timeout=1)
+            self.ser = serial.Serial(port_name, baudrate, timeout=1)
 
             commands = [
                 b"AT Z\r", b"AT E1\r", b"AT L1\r", b"AT H1\r",
