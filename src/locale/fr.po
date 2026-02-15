@@ -296,13 +296,13 @@ msgid "ui_main_window_diagnostics_analysis_issue"
 msgstr "• {}\n"
 
 msgid "ui_main_window_diagnostics_scanning"
-msgstr "Scan…\n"
+msgstr "Analyse de tous les modules (Moteur, Transmission, En attente)...\nCela peut prendre quelques secondes.\n"
 
 msgid "ui_main_window_diagnostics_no_faults"
-msgstr "Aucun code défaut."
+msgstr "\n✅ <e.\n(Vérifications Moteur, Transmission et En attente réussies)"
 
 msgid "ui_main_window_diagnostics_found_faults"
-msgstr "{len(codes)} défaut(s) trouvé(s) :\n"
+msgstr "\n⚠️ Analyse terminée. {} problèmes trouvés au total."
 
 msgid "ui_main_window_diagnostics_found_fault"
 msgstr "• {} : {}\n"
@@ -338,7 +338,7 @@ msgid "ui_main_window_clear_codes_warning_message"
 msgstr "Sauvegarde complète faite ?\nEffacement irréversible Freeze Frame.\nContinuer ?"
 
 msgid "ui_main_window_clear_codes_clearing"
-msgstr "Effacement…\n"
+msgstr "Envoi de la commande d'effacement...\n"
 
 msgid "ui_main_window_clear_codes_success"
 msgstr "\nSUCCÈS : codes effacés.\n"
@@ -350,7 +350,7 @@ msgid "ui_main_window_clear_codes_success_message"
 msgstr "Codes effacés."
 
 msgid "ui_main_window_clear_codes_failed"
-msgstr "\nÉCHEC : impossible."
+msgstr "\n❌ ÉCHEC : L’ECU a rejeté la commande.\nAssurez-vous que le moteur est ARRÊTÉ.\n"
 
 msgid "ui_main_window_clear_codes_moving"
 msgstr "EN MOUVEMENT"
