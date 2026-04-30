@@ -83,5 +83,6 @@ The CAN Hacker tool allows raw data injection. Use with extreme caution and neve
 ## License
 Open Source. Feel free to fork and improve!
 ## Other info
+
 Used icon:
 <a href="https://www.flaticon.com/free-icons/motor" title="motor icons">Motor icons created by Freepik - Flaticon</a>
