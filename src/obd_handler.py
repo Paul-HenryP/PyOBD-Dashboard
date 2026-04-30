@@ -18,7 +18,19 @@ class OBDHandler:
 
         self.sim_start_time = time.time()
         self.sim_speed = 0
-
+    
+    def _parse_host_port(self, s):
+        if s is None:
+            return None
+        m = re.match(r"^\s*([^\s:]+)\s*:\s*(\d{1,5})\s*$", s)
+        if m is None:
+            return None
+        host = m.group(1)
+        port = int(m.group(2))
+        if 0 < port and port < 65536:
+            return host, port
+        return None
+    
     def log(self, message):
         if self.log_callback:
             self.log_callback(message)
@@ -30,7 +42,7 @@ class OBDHandler:
     def is_connected(self):
         return self.status == "Connected" or self.status == "Connected (SIMULATION)"
 
-    def connect(self, port_name=None):
+    def connect(self, port_name=None, baudrate=115200):
         if self.simulation:
             self.log("Attempting connection (SIMULATION)...")
             self.status = "Connected (SIMULATION)"
@@ -41,10 +53,18 @@ class OBDHandler:
         self.log(f"Attempting connection to {port_name if port_name else 'Auto-Scan'}...")
 
         try:
-            if port_name and port_name != "Auto":
-                self.connection = obd.OBD(portstr=port_name, fast=False, timeout=30)
+            
+            hp = self._parse_host_port(port_name)
+
+            if hp is not None:
+                host, port = hp
+                portstr = f"socket://{host}:{port}"
+                self.connection = obd.OBD(portstr=portstr, fast=False, timeout=30, baudrate=baudrate)
             else:
-                self.connection = obd.OBD(fast=False, timeout=30)
+                if port_name and port_name != "Auto":
+                    self.connection = obd.OBD(portstr=port_name, fast=False, timeout=30, baudrate=baudrate)
+                else:
+                    self.connection = obd.OBD(fast=False, timeout=30, baudrate=baudrate)
 
             if self.connection.is_connected():
                 self.status = "Connected"

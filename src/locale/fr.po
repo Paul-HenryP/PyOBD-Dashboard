@@ -1,0 +1,362 @@
+msgid "ui_tab_dashboard_port"
+msgstr "Port :"
+
+msgid "ui_tab_dashboard_baud"
+msgstr "Débit :"
+
+msgid "ui_tab_dashboard_connect"
+msgstr "CONNECTER"
+
+msgid "ui_tab_dashboard_page"
+msgstr "Page {}/{}"
+
+msgid "ui_tab_diagnostics_analyze"
+msgstr "LANCER L’ANALYSE"
+
+msgid "ui_tab_diagnostics_scan_codes"
+msgstr "SCAN DES CODES"
+
+msgid "ui_tab_diagnostics_full_backup"
+msgstr "SAUVEGARDE COMPLÈTE"
+
+msgid "ui_tab_diagnostics_clear_codes"
+msgstr "EFFACER LES CODES"
+
+msgid "ui_tab_diagnostics_ready_message"
+msgstr "Prêt.\nUtilisez 'Lancer l’analyse' pour vérifier les données capteurs.\nUtilisez 'Scan des codes' pour vérifier les erreurs ECU."
+
+msgid "ui_tab_dyno_performance"
+msgstr "PERFORMANCE"
+
+msgid "ui_tab_dyno_mode_dyno"
+msgstr "Banc"
+
+msgid "ui_tab_dyno_drag"
+msgstr "0-100 km/h"
+
+msgid "ui_tab_dyno_car_weight"
+msgstr "Poids véhicule (kg) :"
+
+msgid "ui_tab_dyno_car_weight_entry_placeholder"
+msgstr "ex. 1500"
+
+msgid "ui_tab_dyno_hp"
+msgstr "{} ch"
+
+msgid "ui_tab_dyno_peak_power"
+msgstr "Puissance max"
+
+msgid "ui_tab_dyno_torque"
+msgstr "{} Nm"
+
+msgid "ui_tab_dyno_torque_title"
+msgstr "Couple max"
+
+msgid "ui_tab_dyno_start"
+msgstr "DÉMARRER TEST"
+
+msgid "ui_tab_dyno_drag_status_stop"
+msgstr "ARRÊTER LE VÉHICULE"
+
+msgid "ui_tab_dyno_drag_status_ready"
+msgstr "PRÊT"
+
+msgid "ui_tab_dyno_drag_status_go"
+msgstr "PARTEZ !"
+
+msgid "ui_tab_dyno_drag_status_finished"
+msgstr "TERMINÉ"
+
+msgid "ui_tab_dyno_drag_timer"
+msgstr "{:.2f} s"
+
+msgid "ui_tab_dyno_drag_best"
+msgstr "Meilleur : {:.2f}"
+
+msgid "ui_tab_dyno_drag_reset"
+msgstr "RÉINITIALISER"
+
+msgid "ui_tab_dyno_graph_x_axis"
+msgstr "RPM"
+
+msgid "ui_tab_dyno_graph_y_axis"
+msgstr "Puissance (ch)"
+
+msgid "ui_tab_dyno_graph_y2_axis"
+msgstr "Couple (Nm)"
+
+msgid "ui_tab_dyno_help_message"
+msgstr ""
+"MODES PERFORMANCE :\n\n"
+"1. BANC VIRTUEL (Mesure puissance) :\n"
+"   - Entrer le poids du véhicule.\n"
+"   - Démarrer → 3e vitesse → Pleine charge → Rupteur → Stop.\n"
+"   - Affiche la courbe puissance/couple basée sur l’accélération.\n\n"
+"2. DRAG 0-100 km/h :\n"
+"   - Arrêter complètement le véhicule (0 km/h).\n"
+"   - Statut = 'PRÊT'.\n"
+"   - Accélérer.\n"
+"   - Chrono stoppé automatiquement à 100 km/h."
+
+msgid "ui_tab_dyno_help_title"
+msgstr "Instructions :"
+
+msgid "ui_tab_dyno_stop"
+msgstr "STOP"
+
+msgid "ui_tab_graph_left_axis"
+msgstr "Axe gauche (Bleu) :"
+
+msgid "ui_tab_graph_right_axis"
+msgstr "Axe droit (Rouge) :"
+
+msgid "ui_tab_graph_pause"
+msgstr "Pause"
+
+msgid "ui_tab_graph_play"
+msgstr "Lecture"
+
+msgid "ui_tab_graph_left_axis_value_rpm"
+msgstr "RPM"
+
+msgid "ui_tab_graph_right_axis_value_speed"
+msgstr "VITESSE"
+
+msgid "ui_tab_help_guide_safety"
+msgstr "Guide utilisateur PyOBD & Sécurité"
+
+msgid "ui_tab_help_safety_header"
+msgstr "🛡️ Sécurité ECU"
+
+msgid "ui_tab_help_safety"
+msgstr ""
+"Application conçue avec plusieurs niveaux de protection pour un usage moteur en marche :\n\n"
+"1. MODE LECTURE SEULE :\n"
+"   Les onglets Dashboard et Graph n’envoient que des requêtes lecture (Mode 01/22).\n"
+"   Aucun réglage ECU modifié.\n\n"
+"2. LIMITATION INTELLIGENTE :\n"
+"   Polling priorisé (RPM, vitesse).\n"
+"   Évite saturation CAN.\n\n"
+"3. ISOLATION PROTOCOLE :\n"
+"   Seule écriture : effacement codes.\n"
+"   Protégé par confirmation et blocage en roulant."
+
+msgid "ui_tab_help_tutorial_header"
+msgstr "🚀 Démarrage rapide"
+
+msgid "ui_tab_help_tutorial"
+msgstr ""
+"1. CONNEXION :\n"
+"   - Brancher l’ELM327 sur OBD-II.\n"
+"   - Contact ON.\n"
+"   - Rafraîchir ports.\n"
+"   - Sélectionner port puis CONNECTER.\n\n"
+"2. PRO PACKS :\n"
+"   - Onglet Settings.\n"
+"   - Manage Pro Packs.\n"
+"   - Choisir modèle véhicule puis Save & Reload.\n\n"
+"3. MODE DYNO :\n"
+"   - Route privée sécurisée.\n"
+"   - Entrer poids véhicule.\n"
+"   - Start → accélération → Stop."
+
+msgid "ui_tab_help_troubleshooting_header"
+msgstr "🔧 Dépannage"
+
+msgid "ui_tab_help_troubleshooting"
+msgstr ""
+"• Interface détectée sans ECU : contact OFF.\n\n"
+"• Mises à jour lentes : désactiver capteurs inutiles.\n\n"
+"• Code inconnu : code constructeur, chercher modèle + code."
+
+msgid "ui_tab_help_warning"
+msgstr "⚠️ Utilisation sous votre responsabilité. Restez attentif à la route."
+
+msgid "ui_tab_settings_show_pack"
+msgstr "Pack affiché :"
+
+msgid "ui_tab_settings_manage_pro_packs"
+msgstr "Gérer Pro Packs"
+
+msgid "ui_tab_settings_theme"
+msgstr "Thème :"
+
+msgid "ui_tab_settings_sensors_show_all"
+msgstr "Tous"
+
+msgid "ui_tab_settings_sensors_show_none"
+msgstr "Aucun"
+
+msgid "ui_tab_settings_sensors_show"
+msgstr "Afficher"
+
+msgid "ui_tab_settings_sensors_log_all"
+msgstr "Tous"
+
+msgid "ui_tab_settings_sensors_log_none"
+msgstr "Aucun"
+
+msgid "ui_tab_settings_sensors_log"
+msgstr "Logger"
+
+msgid "ui_tab_settings_sensors_name"
+msgstr "Capteur"
+
+msgid "ui_tab_settings_sensors_limit"
+msgstr "Limite"
+
+msgid "ui_tab_settings_log_path"
+msgstr "Chemin sauvegarde : {}"
+
+msgid "ui_tab_settings_log_change_folder"
+msgstr "Changer dossier"
+
+msgid "ui_tab_settings_dev_mode"
+msgstr "Mode développeur"
+
+msgid "ui_tab_settings_sim"
+msgstr "Simulation"
+
+msgid "ui_tab_settings_sim_mode"
+msgstr "Mode :"
+
+msgid "ui_tab_settings_sim_start"
+msgstr "Démarrer"
+
+msgid "ui_tab_settings_sim_stop"
+msgstr "Arrêter"
+
+msgid "ui_tab_settings_pack_manager_window_title"
+msgstr "Gestion Pro Packs"
+
+msgid "ui_tab_settings_pack_manager_scan_path"
+msgstr "Chemin scan :\n{}"
+
+msgid "ui_tab_settings_pack_manager_no_files_found"
+msgstr "Aucun .json trouvé."
+
+msgid "ui_tab_settings_pack_manager_save_reload"
+msgstr "Sauver & Recharger"
+
+msgid "ui_tab_settings_language"
+msgstr "Language (redémarrage requis):"
+
+msgid "ui_main_window_title"
+msgstr "PyOBD Professional - Édition Ultime"
+
+msgid "ui_main_window_tab_dashboard"
+msgstr "Tableau de bord"
+
+msgid "ui_main_window_tab_live_graph"
+msgstr "Graphique"
+
+msgid "ui_main_window_tab_dyno"
+msgstr "Dyno"
+
+msgid "ui_main_window_tab_diagnostics"
+msgstr "Diagnostic"
+
+msgid "ui_main_window_tab_settings"
+msgstr "Paramètres"
+
+msgid "ui_main_window_tab_help"
+msgstr "Aide"
+
+msgid "ui_main_window_sensor_description"
+msgstr "{} : Capteur constructeur."
+
+msgid "ui_main_window_tab_debug_log"
+msgstr "Journal debug"
+
+msgid "ui_main_window_connect_working"
+msgstr "Connexion…"
+
+msgid "ui_main_window_connect_disconnect"
+msgstr "DÉCONNECTER"
+
+msgid "ui_main_window_connect_connect"
+msgstr "CONNECTER"
+
+msgid "ui_main_window_settings_log_path"
+msgstr "Chemin sauvegarde : {}"
+
+msgid "ui_main_window_diagnostics_error_not_connected"
+msgstr "Erreur : connecter le véhicule."
+
+msgid "ui_main_window_diagnostics_gathering_data"
+msgstr "Collecte données…\n"
+
+msgid "ui_main_window_diagnostics_analysis_passed"
+msgstr "✅ Analyse OK."
+
+msgid "ui_main_window_diagnostics_analysis_issues"
+msgstr "⚠️ {} problème(s) potentiel(s) :\n"
+
+msgid "ui_main_window_diagnostics_analysis_issue"
+msgstr "• {}\n"
+
+msgid "ui_main_window_diagnostics_scanning"
+msgstr "Analyse de tous les modules (Moteur, Transmission, En attente)...\nCela peut prendre quelques secondes.\n"
+
+msgid "ui_main_window_diagnostics_no_faults"
+msgstr "\n✅ <e.\n(Vérifications Moteur, Transmission et En attente réussies)"
+
+msgid "ui_main_window_diagnostics_found_faults"
+msgstr "\n⚠️ Analyse terminée. {} problèmes trouvés au total."
+
+msgid "ui_main_window_diagnostics_found_fault"
+msgstr "• {} : {}\n"
+
+msgid "ui_main_window_backup_error_title"
+msgstr "Erreur"
+
+msgid "ui_main_window_backup_error_not_connected"
+msgstr "Connecter le véhicule."
+
+msgid "ui_main_window_backup_reading_system_data"
+msgstr "Lecture système…\n"
+
+msgid "ui_main_window_backup_success"
+msgstr "SUCCÈS : sauvegarde :\n{}\n\n"
+
+msgid "ui_main_window_backup_snapshot"
+msgstr "Snapshot : {}"
+
+msgid "ui_main_window_backup_error"
+msgstr "Erreur sauvegarde : {}"
+
+msgid "ui_main_window_clear_codes_error_title"
+msgstr "Erreur"
+
+msgid "ui_main_window_clear_codes_error_not_connected"
+msgstr "Connecter véhicule."
+
+msgid "ui_main_window_clear_codes_warning_title"
+msgstr "ATTENTION"
+
+msgid "ui_main_window_clear_codes_warning_message"
+msgstr "Sauvegarde complète faite ?\nEffacement irréversible Freeze Frame.\nContinuer ?"
+
+msgid "ui_main_window_clear_codes_clearing"
+msgstr "Envoi de la commande d'effacement...\n"
+
+msgid "ui_main_window_clear_codes_success"
+msgstr "\nSUCCÈS : codes effacés.\n"
+
+msgid "ui_main_window_clear_codes_success_title"
+msgstr "Succès"
+
+msgid "ui_main_window_clear_codes_success_message"
+msgstr "Codes effacés."
+
+msgid "ui_main_window_clear_codes_failed"
+msgstr "\n❌ ÉCHEC : L’ECU a rejeté la commande.\nAssurez-vous que le moteur est ARRÊTÉ.\n"
+
+msgid "ui_main_window_clear_codes_moving"
+msgstr "EN MOUVEMENT"
+
+msgid "ui_main_window_clear_codes_clear_button"
+msgstr "EFFACER CODES"
+
+msgid "ui_main_window_settings_log_save_path"
+msgstr "Chemin d’enregistrement : {}"

@@ -3,3 +3,5 @@ customtkinter
 pyserial
 matplotlib
 cryptography
+polib
+ELM327-emulator

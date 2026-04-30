@@ -23,6 +23,7 @@ from ui.tabs.settings_tab import SettingsTab
 from ui.tabs.diagnostics_tab import DiagnosticsTab, DebugTab
 from ui.tabs.dyno_tab import DynoTab
 from ui.tabs.help_tab import HelpTab
+from translation import translate, set_language
 
 _UI_RENDER_OPTS_A = [53, 51, 67, 90, 49, 118, 107, 51, 73, 100, 100, 85, 54, 108, 73, 120, 100, 82, 73, 97, 65, 67]
 _UI_RENDER_OPTS_B = [75, 75, 101, 100, 112, 52, 99, 89, 111, 49, 117, 104, 107, 116, 75, 76, 51, 115, 103, 115, 81, 61]
@@ -31,6 +32,11 @@ _UI_RENDER_OPTS_B = [75, 75, 101, 100, 112, 52, 99, 89, 111, 49, 117, 104, 107, 
 def _get_render_context():
     return bytes(_UI_RENDER_OPTS_A + _UI_RENDER_OPTS_B)
 
+def window_ensure_show_and_focus(root):
+    root.lift()
+    root.focus_force()
+    root.attributes("-topmost", True)
+    root.after(0, lambda: root.attributes("-topmost", False))
 
 class DashboardApp(ctk.CTk):
     def __init__(self, obd_handler):
@@ -40,6 +46,7 @@ class DashboardApp(ctk.CTk):
         self.obd.log_callback = self.append_debug_log
 
         self.config = ConfigManager.load_config()
+        set_language(self.config.get("lang", "en"))
         self.sensor_state = {}
         self.available_sensors = {}
         self.sensor_sources = {}
@@ -50,8 +57,9 @@ class DashboardApp(ctk.CTk):
         self.txt_debug = None
         self.sensor_history = defaultdict(lambda: deque([0] * 60, maxlen=60))
 
-        self.title("PyOBD Professional - Ultimate Edition")
+        self.title(translate("ui_main_window_title"))
         self.geometry("1100x800")
+        window_ensure_show_and_focus(self)
 
         saved_theme = self.config.get("theme", "Cyber")
         ThemeManager.set_theme(saved_theme)
@@ -63,15 +71,16 @@ class DashboardApp(ctk.CTk):
         self.tabview = ctk.CTkTabview(self)
         self.tabview.pack(fill="both", expand=True, padx=20, pady=20)
 
-        self.tab_dash = self.tabview.add("Dashboard")
-        self.tab_graph = self.tabview.add("Live Graph")
-        self.tab_dyno = self.tabview.add("Dyno")
-        self.tab_diag = self.tabview.add("Diagnostics")
-        self.tab_settings = self.tabview.add("Settings")
-        self.tab_help = self.tabview.add("Help")
+        self.tab_dash = self.tabview.add(translate("ui_main_window_tab_dashboard"))
+        self.tab_graph = self.tabview.add(translate("ui_main_window_tab_live_graph"))
+        self.tab_dyno = self.tabview.add(translate("ui_main_window_tab_dyno"))
+        self.tab_diag = self.tabview.add(translate("ui_main_window_tab_diagnostics"))
+        self.tab_settings = self.tabview.add(translate("ui_main_window_tab_settings"))
+        self.tab_help = self.tabview.add(translate("ui_main_window_tab_help"))
 
         self.var_dev_mode = ctk.BooleanVar(value=self.config.get("developer_mode", False))
-        self.var_port = ctk.StringVar(value="Auto")
+        self.var_port = ctk.StringVar(value=self.config.get("port", "Auto"))
+        self.var_baud = ctk.StringVar(value=self.config.get("baud_rate", "38400"))
         self.var_graph_left = ctk.StringVar(value="RPM")
         self.var_graph_right = ctk.StringVar(value="SPEED")
 
@@ -91,7 +100,7 @@ class DashboardApp(ctk.CTk):
         if "log_dir" in self.config:
             self.logger.set_directory(self.config["log_dir"])
             if hasattr(self, 'lbl_path'):
-                self.lbl_path.configure(text=f"Save Path: {self.logger.log_dir}")
+                self.lbl_path.configure(text=translate("ui_main_window_settings_log_save_path").format(self.logger.log_dir))
 
         self.ui_dashboard.rebuild_grid()
         self.update_loop()
@@ -191,7 +200,7 @@ class DashboardApp(ctk.CTk):
             if len(tuple_data) > 5:
                 description = tuple_data[5]
             else:
-                description = f"{name}: Manufacturer specific sensor."
+                description = translate("ui_main_window_sensor_description").format(name)
 
             if cmd in old_state:
                 is_show = old_state[cmd]["show_var"].get()
@@ -223,20 +232,20 @@ class DashboardApp(ctk.CTk):
     def refresh_dev_mode_visibility(self):
         is_dev = self.var_dev_mode.get()
         try:
-            self.tabview.tab("Debug Log")
+            self.tabview.tab(translate("ui_main_window_tab_debug_log"))
             exists = True
         except:
             exists = False
 
         if is_dev and not exists:
-            self.tabview.add("Debug Log")
-            self.ui_debug = DebugTab(self.tabview.tab("Debug Log"), self)
+            self.tabview.add(translate("ui_main_window_tab_debug_log"))
+            self.ui_debug = DebugTab(self.tabview.tab(translate("ui_main_window_tab_debug_log")), self)
             for msg in self.log_buffer:
                 if self.txt_debug:
                     self.txt_debug.insert("end", msg + "\n")
             if self.txt_debug: self.txt_debug.see("end")
         elif not is_dev and exists:
-            self.tabview.delete("Debug Log")
+            self.tabview.delete(translate("ui_main_window_tab_debug_log"))
             self.txt_debug = None
 
     def get_serial_ports(self):
@@ -269,14 +278,18 @@ class DashboardApp(ctk.CTk):
         port_selection = self.var_port.get()
         is_demo = (port_selection == "Demo Mode")
         target_port = None if port_selection == "Auto" else port_selection
+        try:
+            target_baud_rate = int(self.var_baud.get())
+        except:
+            target_baud_rate = 115200
         if is_demo: target_port = None
 
         if hasattr(self.ui_dashboard.app, 'btn_connect'):
-            self.ui_dashboard.app.btn_connect.configure(state="disabled", text="Working...")
+            self.ui_dashboard.app.btn_connect.configure(state="disabled", text=translate("ui_main_window_connect_working"))
 
-        threading.Thread(target=self.bg_connection_task, args=(is_demo, target_port), daemon=True).start()
+        threading.Thread(target=self.bg_connection_task, args=(is_demo, target_port, target_baud_rate), daemon=True).start()
 
-    def bg_connection_task(self, is_demo, target_port):
+    def bg_connection_task(self, is_demo, target_port, target_baud_rate):
         """Runs in background thread"""
         connected = False
 
@@ -285,8 +298,7 @@ class DashboardApp(ctk.CTk):
             connected = False
         else:
             self.obd.simulation = is_demo
-            connected = self.obd.connect(target_port)
-
+            connected = self.obd.connect(target_port, baudrate=target_baud_rate)
         self.after(0, lambda: self.post_connection_update(connected))
 
     def post_connection_update(self, connected):
@@ -295,7 +307,7 @@ class DashboardApp(ctk.CTk):
             self.ui_dashboard.app.btn_connect.configure(state="normal")
 
             if connected:
-                self.ui_dashboard.app.btn_connect.configure(text="DISCONNECT", fg_color=ThemeManager.get("WARNING"))
+                self.ui_dashboard.app.btn_connect.configure(text=translate("ui_main_window_connect_disconnect"), fg_color=ThemeManager.get("WARNING"))
 
                 count_enabled = 0
                 count_supported = 0
@@ -340,7 +352,7 @@ class DashboardApp(ctk.CTk):
                 self.append_debug_log(f"Smart Filter enabled {count_enabled} relevant sensors.")
 
             else:
-                self.ui_dashboard.app.btn_connect.configure(text="CONNECT", fg_color=ThemeManager.get("ACCENT"))
+                self.ui_dashboard.app.btn_connect.configure(text=translate("ui_main_window_connect_connect"), fg_color=ThemeManager.get("ACCENT"))
 
         if not connected:
             for cmd, state in self.sensor_state.items():
@@ -353,7 +365,7 @@ class DashboardApp(ctk.CTk):
         if new_dir:
             if self.logger.set_directory(new_dir):
                 if hasattr(self.ui_settings.app, 'lbl_path'):
-                    self.ui_settings.app.lbl_path.configure(text=f"Save Path: {new_dir}")
+                    self.ui_settings.app.lbl_path.configure(text=translate("ui_main_window_settings_log_path").format(new_dir))
 
     def append_debug_log(self, message):
         self.log_buffer.append(message)
@@ -368,12 +380,12 @@ class DashboardApp(ctk.CTk):
         if not self.obd.is_connected():
             if hasattr(self.ui_diagnostics.app, 'txt_dtc'):
                 self.ui_diagnostics.app.txt_dtc.delete("1.0", "end")
-                self.ui_diagnostics.app.txt_dtc.insert("end", "Error: Connect to car first.")
+                self.ui_diagnostics.app.txt_dtc.insert("end", translate("ui_main_window_diagnostics_error_not_connected"))
             return
 
         if hasattr(self.ui_diagnostics.app, 'txt_dtc'):
             self.ui_diagnostics.app.txt_dtc.delete("1.0", "end")
-            self.ui_diagnostics.app.txt_dtc.insert("end", "Gathering data for analysis...\n")
+            self.ui_diagnostics.app.txt_dtc.insert("end", translate("ui_main_window_diagnostics_gathering_data"))
         self.update()
 
         snapshot = {}
@@ -386,23 +398,22 @@ class DashboardApp(ctk.CTk):
 
         if hasattr(self.ui_diagnostics.app, 'txt_dtc'):
             if not issues:
-                self.ui_diagnostics.app.txt_dtc.insert("end", "✅ System Analysis Passed.")
+                self.ui_diagnostics.app.txt_dtc.insert("end", translate("ui_main_window_diagnostics_analysis_passed"))
             else:
-                self.ui_diagnostics.app.txt_dtc.insert("end", f"⚠️ Found {len(issues)} Potential Issues:\n", "bold")
+                self.ui_diagnostics.app.txt_dtc.insert("end", translate("ui_main_window_diagnostics_analysis_issues").format(len(issues)), "bold")
                 for issue in issues:
-                    self.ui_diagnostics.app.txt_dtc.insert("end", f"• {issue}\n")
+                    self.ui_diagnostics.app.txt_dtc.insert("end", translate("ui_main_window_diagnostics_analysis_issue").format(issue))
 
     def scan_codes(self):
         if not hasattr(self.ui_diagnostics.app, 'txt_dtc'): return
 
         if not self.obd.is_connected():
             self.ui_diagnostics.app.txt_dtc.delete("1.0", "end")
-            self.ui_diagnostics.app.txt_dtc.insert("end", "Error: Not Connected.")
+            self.ui_diagnostics.app.txt_dtc.insert("end", translate("ui_main_window_diagnostics_error_not_connected"))
             return
 
         self.ui_diagnostics.app.txt_dtc.delete("1.0", "end")
-        self.ui_diagnostics.app.txt_dtc.insert("end",
-                                               "Scanning all modules (Engine, Transmission, Pending)...\nThis may take a few seconds.\n")
+        self.ui_diagnostics.app.txt_dtc.insert("end", translate("ui_main_window_diagnostics_scanning"))
         self.update()
 
         dtc_groups = self.obd.get_dtc()
@@ -420,19 +431,19 @@ class DashboardApp(ctk.CTk):
                 self.ui_diagnostics.app.txt_dtc.insert("end", f"\n--- {category} ---\n", "bold")
 
                 for c in codes:
-                    self.ui_diagnostics.app.txt_dtc.insert("end", f" • {c[0]}: {c[1]}\n")
+                    self.ui_diagnostics.app.txt_dtc.insert("end", translate("ui_main_window_diagnostics_found_fault").format(c[0], c[1]))
 
         if not found_any:
             self.ui_diagnostics.app.txt_dtc.insert("end",
-                                                   "\n✅ No Fault Codes Found in any module.\n(Engine, Transmission, and Pending checks passed)")
+                                                   translate("ui_main_window_diagnostics_no_faults"))
         else:
-            self.ui_diagnostics.app.txt_dtc.insert("end", f"\n⚠️ Scan Finished. Found {total_faults} issues total.")
+            self.ui_diagnostics.app.txt_dtc.insert("end", translate("ui_main_window_diagnostics_found_faults").format(len(codes)))
 
     def perform_full_backup(self):
-        if not self.obd.is_connected(): messagebox.showerror("Error", "Connect to car first!"); return
+        if not self.obd.is_connected(): messagebox.showerror(translate("ui_main_window_backup_error_title"), translate("ui_main_window_backup_error_not_connected")); return
         if hasattr(self.ui_diagnostics.app, 'txt_dtc'):
             self.ui_diagnostics.app.txt_dtc.delete("1.0", "end")
-            self.ui_diagnostics.app.txt_dtc.insert("end", "Reading System Data...\n")
+            self.ui_diagnostics.app.txt_dtc.insert("end", translate("ui_main_window_backup_reading_system_data"))
         self.update()
 
         codes = self.obd.get_dtc()
@@ -445,37 +456,30 @@ class DashboardApp(ctk.CTk):
             with open(filepath, 'w') as f:
                 json.dump(report, f, indent=4)
             if hasattr(self.ui_diagnostics.app, 'txt_dtc'):
-                self.ui_diagnostics.app.txt_dtc.insert("end", f"SUCCESS: Backup saved to:\n{filepath}\n\n")
-                self.ui_diagnostics.app.txt_dtc.insert("end", f"Snapshot: {json.dumps(snapshot, indent=2)}")
+                self.ui_diagnostics.app.txt_dtc.insert("end", translate("ui_main_window_backup_success").format(filepath))
+                self.ui_diagnostics.app.txt_dtc.insert("end", translate("ui_main_window_backup_snapshot").format(json.dumps(snapshot, indent=2)))
         except Exception as e:
             if hasattr(self.ui_diagnostics.app, 'txt_dtc'):
-                self.ui_diagnostics.app.txt_dtc.insert("end", f"Error saving backup: {e}")
+                self.ui_diagnostics.app.txt_dtc.insert("end", translate("ui_main_window_backup_error").format(e))
 
     def confirm_clear_codes(self):
         if not self.obd.is_connected():
-            messagebox.showerror("Error", "Connect to car first!")
+            messagebox.showerror(translate("ui_main_window_clear_codes_error_title"), translate("ui_main_window_clear_codes_error_not_connected"))
             return
 
-        answer = messagebox.askyesno(
-            "WARNING: Clear Codes?",
-            "Requirements for success:\n"
-            "1. Ignition MUST be ON.\n"
-            "2. Engine MUST be OFF.\n\n"
-            "This will erase temporary data. Proceed?"
-        )
-
+        answer = messagebox.askyesno(translate("ui_main_window_clear_codes_warning_title"), translate("ui_main_window_clear_codes_warning_message"))
         if answer:
 
             if hasattr(self.ui_diagnostics.app, 'txt_dtc'):
                 self.ui_diagnostics.app.txt_dtc.delete("1.0", "end")
-                self.ui_diagnostics.app.txt_dtc.insert("end", "Sending Clear Command...\n")
+                self.ui_diagnostics.app.txt_dtc.insert("end", translate("ui_main_window_clear_codes_clearing"))
             self.update()
 
             success = self.obd.clear_dtc()
 
             if success:
                 if hasattr(self.ui_diagnostics.app, 'txt_dtc'):
-                    self.ui_diagnostics.app.txt_dtc.insert("end", "✅ Command Sent Successfully.\n")
+                    self.ui_diagnostics.app.txt_dtc.insert("end", translate("ui_main_window_clear_codes_success"))
                     self.ui_diagnostics.app.txt_dtc.insert("end", "Waiting 3 seconds to verify...\n")
                 self.update()
 
@@ -488,8 +492,7 @@ class DashboardApp(ctk.CTk):
                                                            "\nNOTE: If codes returned immediately, the physical part is broken/disconnected.")
             else:
                 if hasattr(self.ui_diagnostics.app, 'txt_dtc'):
-                    self.ui_diagnostics.app.txt_dtc.insert("end",
-                                                           "\n❌ FAILED: ECU rejected the command.\nEnsure Engine is OFF.")
+                    self.ui_diagnostics.app.txt_dtc.insert("end", translate("ui_main_window_clear_codes_failed"))
 
     def on_close(self):
         self.running = False
@@ -498,7 +501,10 @@ class DashboardApp(ctk.CTk):
             "enabled_packs": self.config.get("enabled_packs", []),
             "developer_mode": self.var_dev_mode.get(),
             "theme": self.config.get("theme", "Cyber"),
-            "sensors": {}
+            "sensors": {},
+            "port": self.var_port.get(),
+            "baud_rate": self.var_baud.get(),
+            "lang": self.config.get("lang", "en"),
         }
         for cmd, state in self.sensor_state.items():
             data_to_save["sensors"][cmd] = {"show": state["show_var"].get(), "log": state["log_var"].get(),
@@ -515,7 +521,7 @@ class DashboardApp(ctk.CTk):
     def update_loop(self):
         if not self.running: return
 
-        if self.dashboard_dirty and self.tabview.get() == "Dashboard":
+        if self.dashboard_dirty and self.tabview.get() == translate("ui_main_window_tab_dashboard"):
             self.ui_dashboard.rebuild_grid()
             self.dashboard_dirty = False
 
@@ -547,18 +553,18 @@ class DashboardApp(ctk.CTk):
                             if gauge.winfo_ismapped():
                                 gauge.update_value(val)
 
-            if self.tabview.get() == "Live Graph":
+            if self.tabview.get() == translate("ui_main_window_tab_live_graph"):
                 self.ui_graph.update()
 
-            if self.tabview.get() == "Dyno" and hasattr(self, 'ui_dyno') and self.ui_dyno.is_recording:
+            if self.tabview.get() == translate("ui_main_window_tab_dyno") and hasattr(self, 'ui_dyno') and self.ui_dyno.is_recording:
                 current_rpm = data_snapshot.get("RPM", 0)
                 self.ui_dyno.update_dyno(current_speed, current_rpm)
 
             if hasattr(self.ui_diagnostics.app, 'btn_clear'):
                 if current_speed > 0:
-                    self.ui_diagnostics.app.btn_clear.configure(state="disabled", text="MOVING...")
+                    self.ui_diagnostics.app.btn_clear.configure(state="disabled", text=translate("ui_main_window_clear_codes_moving"))
                 else:
-                    self.ui_diagnostics.app.btn_clear.configure(state="normal", text="CLEAR CODES")
+                    self.ui_diagnostics.app.btn_clear.configure(state="normal", text=translate("ui_main_window_clear_codes_clear_button"))
 
             self.logger.write_row(data_snapshot)
 
