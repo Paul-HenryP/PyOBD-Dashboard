@@ -25,7 +25,7 @@ The open-source version supports standard OBD-II protocols (Emissions, RPM, Spee
 
 These JSON packs unlock manufacturer-specific sensors for brands like Toyota, VW, Ford, and BMW.
 
-👉 [**Visit the PyOBD Data Store**](https://paulhenryp.gumroad.com/?section=rVBpcW3kPr3ISlhBzRP7Qw%3D%3D#N34-S8KrTX-u9xtW8d-3Zw==)
+👉 [**Visit the PyOBD Data Store on Ko-fi**](https://ko-fi.com/paulhenryp/shop)
 
 *Do you have a specific car? If you help me verify the PIDs, I will give you the Pro Pack for free.*
 
