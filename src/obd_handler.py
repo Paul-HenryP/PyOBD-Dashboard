@@ -148,6 +148,10 @@ class OBDHandler:
 
         except Exception as e:
             return None
+        finally:
+
+            if header_hex:
+                self._set_header("7DF")
 
     def _calculate_formula(self, formula, data_bytes):
         variables = {}

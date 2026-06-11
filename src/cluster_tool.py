@@ -122,7 +122,6 @@ class SuzukiClusterTool(ctk.CTk):
         else:
             detected_multiplier = 0
 
-        # Suzuki SV650 Denso uses ~16.0 multiplier (sometimes 10 depending on MPH/KMH region)
         if 15.5 < detected_multiplier < 16.5:
             self.multiplier = 16.0
         elif 9.5 < detected_multiplier < 10.5:

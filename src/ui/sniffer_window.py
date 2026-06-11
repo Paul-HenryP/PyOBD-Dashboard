@@ -292,13 +292,30 @@ class SnifferApp(ctk.CTk):
         self.txt_log.see("end")
 
     def inject_once(self):
-        if not self.can.ser and not self.can.simulation: return
+        if not self.can.ser and not self.can.simulation:
+            return
+
         cid = self.entry_id.get()
         data = self.entry_data.get()
+
+        if not cid or not data:
+            return
+
         self.txt_log.insert("end", f"--> TX: {cid} {data}\n", "tx")
+
+        was_sniffing = self.can.is_sniffing
+
         response = self.can.inject_frame(cid, data)
-        if response: self.txt_log.insert("end", f"<-- RX: {response}\n")
+
+        if response:
+            self.txt_log.insert("end", f"<-- RX: {response}\n")
+
         self.txt_log.see("end")
+
+        if was_sniffing:
+            self.can.start_sniffing(self.entry_filter.get(), self.process_can_line)
+        else:
+            self.btn_sniff.configure(text="START SNIFF", fg_color="green")
 
     def save_from_log(self):
         try:

@@ -523,15 +523,33 @@ class DashboardApp(ctk.CTk):
             data_snapshot = {}
             current_speed = 0
 
-            needed_sensors = set(["SPEED", "RPM", "CONTROL_MODULE_VOLTAGE"])
-            needed_sensors.add(self.var_graph_left.get())
-            needed_sensors.add(self.var_graph_right.get())
+            from constants import HIGH_PRIORITY_SENSORS
+
+            fast_queue = set()
+            slow_queue = []
+
+            graph_left = self.var_graph_left.get()
+            graph_right = self.var_graph_right.get()
 
             for cmd, state in self.sensor_state.items():
                 if state["show_var"].get() or state["log_var"].get():
-                    needed_sensors.add(cmd)
+                    if cmd in HIGH_PRIORITY_SENSORS or cmd == graph_left or cmd == graph_right:
+                        fast_queue.add(cmd)
+                    else:
+                        slow_queue.append(cmd)
 
-            for cmd in needed_sensors:
+            sensors_to_query = list(fast_queue)
+
+            if not hasattr(self, '_slow_sensor_index'):
+                self._slow_sensor_index = 0
+
+            if slow_queue:
+                if self._slow_sensor_index >= len(slow_queue):
+                    self._slow_sensor_index = 0
+                sensors_to_query.append(slow_queue[self._slow_sensor_index])
+                self._slow_sensor_index += 1
+
+            for cmd in sensors_to_query:
                 val = self.obd.query_sensor(cmd)
 
                 if val is not None:
@@ -542,7 +560,6 @@ class DashboardApp(ctk.CTk):
                     state = self.sensor_state.get(cmd)
                     if state and state["show_var"].get():
                         gauge = state.get("widget_progress_bar")
-
                         if gauge and hasattr(gauge, 'update_value'):
                             if gauge.winfo_ismapped():
                                 gauge.update_value(val)
@@ -563,4 +580,4 @@ class DashboardApp(ctk.CTk):
             self.logger.write_row(data_snapshot)
 
         if self.running:
-            self.after(100, self.update_loop)
+            self.after(50, self.update_loop)

@@ -1,5 +1,5 @@
 {
-    "log_dir": "C:\\Users\\papaltm\\Documents\\PyOBD-Dashboard\\src\\logs",
+    "log_dir": "C:\\Users\\User\\Desktop\\Python failid\\My Py projects\\PyOBD-Dashboard\\src\\logs",
     "enabled_packs": [
         "Volkswagen\\VW_Sharan_2.0_TDI_DPF.json",
         "Volkswagen\\VW_TDI_DPF_Tech.json"
@@ -66,41 +66,6 @@
             "show": false,
             "log": false,
             "limit": "0"
-        },
-        "VW_DPF_SOOT_CALC": {
-            "show": true,
-            "log": true,
-            "limit": "24"
-        },
-        "VW_DPF_SOOT_MEAS": {
-            "show": true,
-            "log": true,
-            "limit": "24"
-        },
-        "VW_FUEL_LEVEL_LITERS": {
-            "show": true,
-            "log": true,
-            "limit": "70"
-        },
-        "VW_OIL_TEMP": {
-            "show": true,
-            "log": true,
-            "limit": "130"
-        },
-        "VW_EXHAUST_TEMP": {
-            "show": true,
-            "log": true,
-            "limit": "900"
-        },
-        "VW_BOOST_PRESSURE_BAR": {
-            "show": true,
-            "log": true,
-            "limit": "2.5"
-        },
-        "VW_AMBIENT_PRESSURE": {
-            "show": true,
-            "log": true,
-            "limit": "1100"
         },
         "VAG_DPF_SOOT_CALC": {
             "show": true,

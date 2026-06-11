@@ -1,5 +1,6 @@
 import time
 
+
 class DynoEngine:
     def __init__(self):
         self.reset()
@@ -8,13 +9,13 @@ class DynoEngine:
         self.start_time = None
         self.last_time = None
         self.last_speed_ms = 0
+        self.smoothed_accel = 0
         self.peak_hp = 0
         self.peak_torque = 0
         self.data_points = []
 
     def calculate_step(self, weight_kg, speed_kmh, rpm):
         current_time = time.time()
-
         speed_ms = speed_kmh / 3.6
 
         if self.last_time is None:
@@ -28,16 +29,33 @@ class DynoEngine:
         if dt < 0.1:
             return 0, 0
 
-        accel = dv / dt
+        raw_accel = dv / dt
 
-        force = (weight_kg * accel) * 1.15
+        # 2. SMOOTHING FILTER (Critical for OBD integer speed steps)
+        # 30% new reading, 70% previous reading
+        self.smoothed_accel = (self.smoothed_accel * 0.7) + (raw_accel * 0.3)
 
-        power_watts = force * speed_ms
+        # 3. Physics Forces
+        # F = ma (Adding 15% for rotational mass / drivetrain inertia)
+        force_accel = (weight_kg * self.smoothed_accel) * 1.15
+
+        # Aerodynamic Drag (Approximation for a standard car: CdA ~0.7)
+        # F_drag = 0.5 * rho * CdA * v^2
+        rho = 1.225  # Air density
+        cda = 0.75  # Standard car drag area
+        force_aero = 0.5 * rho * cda * (speed_ms ** 2)
+
+        total_force = force_accel + force_aero
+
+        power_watts = total_force * speed_ms
+
+        if power_watts < 0 or raw_accel < 0:
+            power_watts = 0
 
         hp = power_watts / 745.7
 
         kw = power_watts / 1000
-        if rpm > 0:
+        if rpm > 500:
             torque = (kw * 9549) / rpm
         else:
             torque = 0

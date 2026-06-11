@@ -3,6 +3,7 @@ import threading
 import time
 import random
 
+
 class CanHandler:
     def __init__(self):
         self.ser = None
@@ -10,6 +11,7 @@ class CanHandler:
         self.msg_callback = None
         self.simulation = False
         self.active_filter = ""
+        self.sniff_thread = None
 
         self.sim_ids = ["290", "1C0", "4B1", "350", "7E8"]
         self.sim_data = {id: [0] * 8 for id in self.sim_ids}
@@ -27,10 +29,13 @@ class CanHandler:
                 except:
                     pass
 
-            self.ser = serial.Serial(port_name, 38400, timeout=1)
+            try:
+                self.ser = serial.Serial(port_name, 115200, timeout=0.5)
+            except:
+                self.ser = serial.Serial(port_name, 38400, timeout=0.5)
 
             commands = [
-                b"AT Z\r", b"AT E1\r", b"AT L1\r", b"AT H1\r",
+                b"AT Z\r", b"AT E0\r", b"AT L1\r", b"AT H1\r",
                 b"AT SP 6\r", b"AT CAF 0\r"
             ]
 
@@ -46,7 +51,7 @@ class CanHandler:
             return False
 
     def disconnect(self):
-        self.is_sniffing = False
+        self.stop_sniffing()
         self.simulation = False
         if self.ser:
             try:
@@ -56,12 +61,15 @@ class CanHandler:
             self.ser = None
 
     def start_sniffing(self, filter_id="", callback=None):
+        if self.is_sniffing: return
+
         self.msg_callback = callback
         self.is_sniffing = True
         self.active_filter = filter_id.strip()
 
         if self.simulation:
-            threading.Thread(target=self._sim_sniff_loop, daemon=True).start()
+            self.sniff_thread = threading.Thread(target=self._sim_sniff_loop, daemon=True)
+            self.sniff_thread.start()
         else:
             if self.ser and self.ser.is_open:
                 try:
@@ -72,31 +80,47 @@ class CanHandler:
 
                     time.sleep(0.1)
                     self.ser.read_all()
+
                     self.ser.write(b"AT MA\r")
-                    threading.Thread(target=self._sniff_loop, daemon=True).start()
+
+                    self.sniff_thread = threading.Thread(target=self._sniff_loop, daemon=True)
+                    self.sniff_thread.start()
                 except:
                     self.stop_sniffing()
 
     def stop_sniffing(self):
         self.is_sniffing = False
+
         if not self.simulation and self.ser and self.ser.is_open:
             try:
                 self.ser.write(b"\r")
             except:
                 pass
 
+        if self.sniff_thread and self.sniff_thread.is_alive():
+            self.sniff_thread.join(timeout=1.0)
+
+        if self.ser and self.ser.is_open:
+            try:
+                self.ser.read_all()
+            except:
+                pass
+
     def _sniff_loop(self):
         while self.is_sniffing and self.ser and self.ser.is_open:
             try:
-                line = self.ser.readline().decode('utf-8', errors='ignore').strip()
+                raw_line = self.ser.read_until(b'\r')
+                line = raw_line.decode('utf-8', errors='ignore').strip()
+
+                if not line: continue
 
                 if "BUFFER FULL" in line:
                     if self.msg_callback:
-                        self.msg_callback("⚠️ ERROR: ELM327 BUFFER FULL. Stopping. Use a Filter!")
+                        self.msg_callback("⚠️ ERROR: ELM327 BUFFER FULL. Use a Filter!")
                     self.is_sniffing = False
                     break
 
-                if line and self.msg_callback:
+                if line != ">" and self.msg_callback:
                     self.msg_callback(line)
             except Exception:
                 self.is_sniffing = False
@@ -120,24 +144,23 @@ class CanHandler:
 
             if self.msg_callback:
                 self.msg_callback(line)
-
             time.sleep(0.05)
 
-    def _sanitize_hex(self, input_str):
+    def _sanitize_header(self, input_str):
         if not input_str: return ""
         clean = "".join([c for c in input_str.upper() if c in "0123456789ABCDEF"])
+        if len(clean) < 3: return clean.zfill(3)
+        if 3 < len(clean) < 8: return clean.zfill(8)
+        return clean
 
-        if len(clean) % 2 != 0:
-            clean = "0" + clean
-
+    def _sanitize_data(self, input_str):
+        clean = "".join([c for c in input_str.upper() if c in "0123456789ABCDEF"])
+        if len(clean) % 2 != 0: clean = "0" + clean
         return clean
 
     def inject_frame(self, can_id, data):
-        clean_id = self._sanitize_hex(can_id)
-        if len(clean_id) % 2 != 0 and len(clean_id) < 3:
-            clean_id = "0" + clean_id
-
-        clean_data = self._sanitize_hex(data)
+        clean_id = self._sanitize_header(can_id)
+        clean_data = self._sanitize_data(data)
 
         if not clean_id or not clean_data:
             return "Error: Invalid Hex"
@@ -150,13 +173,15 @@ class CanHandler:
 
         try:
             self.stop_sniffing()
-            time.sleep(0.1)
-            self.ser.read_all()
+
             self.ser.write(f"AT SH {clean_id}\r".encode())
             time.sleep(0.05)
+            self.ser.read_all()
+
             self.ser.write(f"{clean_data}\r".encode())
             time.sleep(0.05)
-            return self.ser.read_all().decode('utf-8', errors='ignore')
-        except Exception:
+
+            return self.ser.read_all().decode('utf-8', errors='ignore').strip()
+        except Exception as e:
             self.disconnect()
-            return "Error: Hardware Failure"
+            return f"Error: {e}"

@@ -153,8 +153,13 @@ class DynoTab:
 
                 if self.x_rpm:
                     self.ax.set_xlim(min(self.x_rpm), max(self.x_rpm) + 500)
-                    self.ax.set_ylim(0, max(self.y_hp) * 1.2)
-                    self.ax2.set_ylim(0, max(self.y_tq) * 1.2)
+
+                    max_hp = max(self.y_hp) if max(self.y_hp) > 0 else 10
+                    max_tq = max(self.y_tq) if max(self.y_tq) > 0 else 10
+
+                    self.ax.set_ylim(0, max_hp * 1.2)
+                    self.ax2.set_ylim(0, max_tq * 1.2)
+
                 self.canvas.draw_idle()
 
         self._update_drag_strip(speed_kmh)
