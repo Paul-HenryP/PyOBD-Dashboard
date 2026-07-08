@@ -4,6 +4,8 @@ from obd.utils import bytes_to_int
 import random
 import time
 import re
+import csv
+import threading
 
 class OBDHandler:
     def __init__(self, simulation=False, log_callback=None):
@@ -19,6 +21,10 @@ class OBDHandler:
         self.sim_start_time = time.time()
         self.sim_speed = 0
 
+        self.replay_mode = False
+        self.replay_active = False
+        self.replay_data = {}
+
     def log(self, message):
         if self.log_callback:
             self.log_callback(message)
@@ -28,7 +34,7 @@ class OBDHandler:
         self.pro_defs = defs
 
     def is_connected(self):
-        return self.status == "Connected" or self.status == "Connected (SIMULATION)"
+        return self.status == "Connected" or self.status == "Connected (SIMULATION)" or self.status == "Connected (REPLAY)"
 
     def connect(self, port_name=None):
         if self.simulation:
@@ -74,6 +80,7 @@ class OBDHandler:
 
     def check_supported(self, command_key):
         if self.simulation: return True
+        if getattr(self, 'replay_mode', False): return True
         if not self.is_connected(): return False
 
         if hasattr(obd.commands, command_key):
@@ -94,6 +101,9 @@ class OBDHandler:
             pass
 
     def query_sensor(self, command_key):
+        if self.replay_mode:
+            return self.replay_data.get(command_key, None)
+
         if not self.is_connected(): return None
         if self.simulation: return self._simulate_data(command_key)
 
@@ -149,7 +159,6 @@ class OBDHandler:
         except Exception as e:
             return None
         finally:
-
             if header_hex:
                 self._set_header("7DF")
 
@@ -173,20 +182,14 @@ class OBDHandler:
         return val
 
     def _decode_uds_dtc(self, byte1, byte2, byte3):
-        """Converts 3-byte UDS hex to standard P/U/B/C code"""
-
         type_bits = (byte1 & 0xC0) >> 6
         prefix = {0: "P", 1: "C", 2: "B", 3: "U"}[type_bits]
-
         second_char = (byte1 & 0x30) >> 4
-
         rest_of_byte1 = byte1 & 0x0F
-
         hex_code = f"{prefix}{second_char}{rest_of_byte1:X}{byte2:02X}{byte3:02X}"
         return hex_code.upper()
 
     def _get_uds_dtcs(self, target_header="7E0"):
-        """EXPERIMENTAL: Scan for UDS Service 19 faults"""
         codes = []
         try:
             self.log(f"Attempting UDS (Service 19) Scan on {target_header}...")
@@ -209,7 +212,7 @@ class OBDHandler:
                         b3 = data[i + 2]
                         status = data[i + 3]
 
-                        if status & 0x09:  # 0x01 (Current) or 0x08 (Confirmed)
+                        if status & 0x09:
                             code_str = self._decode_uds_dtc(b1, b2, b3)
                             codes.append((code_str, f"UDS Extended (Status: {status:02X})"))
 
@@ -232,7 +235,6 @@ class OBDHandler:
             "ENGINE - CONFIRMED": [],
             "ENGINE - PENDING": [],
             "UDS / EXTENDED (Experimental)": [],
-
             "TRANSMISSION": []
         }
 
@@ -240,7 +242,6 @@ class OBDHandler:
             return {"ENGINE - CONFIRMED": [("P0300", "Random Misfire")]}
 
         try:
-
             self.log("Scanning Engine (Standard)...")
             self._set_header("7E0")
 
@@ -254,7 +255,6 @@ class OBDHandler:
 
             uds_codes = self._get_uds_dtcs("7E0")
             for c in uds_codes:
-
                 is_duplicate = any(existing[0] == c[0] for existing in dtc_groups["ENGINE - CONFIRMED"])
                 if not is_duplicate:
                     dtc_groups["UDS / EXTENDED (Experimental)"].append(c)
@@ -295,10 +295,8 @@ class OBDHandler:
 
         if self.connection and self.connection.is_connected():
             try:
-
                 self._set_header("7E0")
                 self.connection.query(obd.commands.CLEAR_DTC)
-
                 self._set_header("7E1")
                 self.connection.query(obd.commands.CLEAR_DTC)
                 self._set_header("7E0")
@@ -328,3 +326,54 @@ class OBDHandler:
             if name == 'CONTROL_MODULE_VOLTAGE': return round(val, 2)
             return int(val) if val > 10 else round(val, 2)
         return random.randint(0, 100)
+
+    def start_replay(self, filepath):
+        try:
+            with open(filepath, mode='r', encoding='utf-8') as file:
+                reader = csv.reader(file)
+                try:
+                    headers = next(reader)
+                except StopIteration:
+                    self.log("ERROR: CSV file is completely empty.")
+                    return False
+
+                if not headers or "Timestamp" not in headers[0]:
+                    self.log("ERROR: Invalid CSV format. Missing 'Timestamp' header.")
+                    return False
+        except Exception as e:
+            self.log(f"ERROR: Cannot read CSV file: {e}")
+            return False
+
+        self.replay_mode = True
+        self.replay_active = True
+        self.status = "Connected (REPLAY)"
+        self.log(f"Starting CSV Replay: {filepath}")
+        threading.Thread(target=self._replay_loop, args=(filepath,), daemon=True).start()
+        return True
+
+    def stop_replay(self):
+        self.replay_active = False
+        self.replay_mode = False
+        self.status = "Disconnected"
+
+    def _replay_loop(self, filepath):
+        try:
+            with open(filepath, mode='r') as file:
+                reader = csv.reader(file)
+                headers = next(reader)
+                for row in reader:
+                    if not self.replay_active:
+                        break
+                    current_state = {}
+                    for idx, key in enumerate(headers):
+                        if key != "Timestamp" and idx < len(row) and row[idx]:
+                            try:
+                                current_state[key] = float(row[idx])
+                            except ValueError:
+                                current_state[key] = row[idx]
+                    self.replay_data = current_state
+                    time.sleep(0.2)
+        except Exception as e:
+            self.log(f"Replay Error: {e}")
+        self.log("Replay Finished or Stopped.")
+        self.replay_active = False

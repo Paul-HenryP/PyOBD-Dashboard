@@ -1,6 +1,7 @@
 import customtkinter as ctk
 import os
 import json
+from tkinter import filedialog
 from config_manager import ConfigManager
 from constants import PRO_PACK_DIR
 from ui.theme import ThemeManager
@@ -72,13 +73,23 @@ class SettingsTab:
         frame_log.pack(fill="x", padx=20, pady=20)
         self.app.lbl_path = ctk.CTkLabel(frame_log, text=f"Save Path: {self.app.logger.log_dir}")
         self.app.lbl_path.pack(side="left", padx=10)
-        ctk.CTkButton(frame_log, text="Change Folder", command=self.app.change_log_folder).pack(side="right", padx=10)
+        ctk.CTkButton(frame_log, text="Change Folder", command=self.app.change_log_folder).pack(side="left", padx=10)
+
+        ctk.CTkButton(frame_log, text="▶ Replay CSV Log", fg_color="#005b96",
+                      command=self.start_replay_dialog).pack(side="left", padx=20)
 
         ctk.CTkSwitch(frame_log, text="Developer Mode", variable=self.app.var_dev_mode,
                       command=self.app.refresh_dev_mode_visibility).pack(side="right", padx=20)
 
-    def refresh_settings_list(self, choice=None):
+    def start_replay_dialog(self):
+        filepath = filedialog.askopenfilename(
+            title="Select CSV Log for Replay",
+            filetypes=[("CSV Files", "*.csv")]
+        )
+        if filepath and hasattr(self.app, "start_csv_replay"):
+            self.app.start_csv_replay(filepath)
 
+    def refresh_settings_list(self, choice=None):
         for widget in self.settings_scroll.winfo_children():
             widget.destroy()
 
@@ -151,7 +162,7 @@ class SettingsTab:
             ConfigManager.save_config(self.app.config)
             window.destroy()
 
-            self.app.configure(cursor="watch");
+            self.app.configure(cursor="watch")
             self.app.update()
             self.app.reload_sensor_definitions()
             self.update_filter_options()

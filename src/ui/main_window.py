@@ -1,5 +1,4 @@
 from tkinter import messagebox, filedialog
-
 import customtkinter as ctk
 import json
 import os
@@ -27,10 +26,8 @@ from ui.tabs.help_tab import HelpTab
 _UI_RENDER_OPTS_A = [53, 51, 67, 90, 49, 118, 107, 51, 73, 100, 100, 85, 54, 108, 73, 120, 100, 82, 73, 97, 65, 67]
 _UI_RENDER_OPTS_B = [75, 75, 101, 100, 112, 52, 99, 89, 111, 49, 117, 104, 107, 116, 75, 76, 51, 115, 103, 115, 81, 61]
 
-
 def _get_render_context():
     return bytes(_UI_RENDER_OPTS_A + _UI_RENDER_OPTS_B)
-
 
 class DashboardApp(ctk.CTk):
     def __init__(self, obd_handler):
@@ -265,7 +262,6 @@ class DashboardApp(ctk.CTk):
             self.ui_graph.app.menu_right.configure(values=options)
 
     def on_connect_click(self):
-
         port_selection = self.var_port.get()
         is_demo = (port_selection == "Demo Mode")
         target_port = None if port_selection == "Auto" else port_selection
@@ -276,54 +272,56 @@ class DashboardApp(ctk.CTk):
 
         threading.Thread(target=self.bg_connection_task, args=(is_demo, target_port), daemon=True).start()
 
-    def bg_connection_task(self, is_demo, target_port):
-        """Runs in background thread"""
-        connected = False
+    def start_csv_replay(self, filepath):
+        if self.obd.is_connected() or getattr(self.obd, 'replay_active', False):
+            self.obd.disconnect()
+            if hasattr(self.obd, 'stop_replay'):
+                self.obd.stop_replay()
 
+        success = self.obd.start_replay(filepath)
+
+        if success:
+            self.post_connection_update(True)
+            if hasattr(self.ui_dashboard.app, 'btn_connect'):
+                self.ui_dashboard.app.btn_connect.configure(text="STOP REPLAY", fg_color=ThemeManager.get("WARNING"))
+        else:
+            messagebox.showerror("Replay Error", "Invalid CSV file!\nPlease select a valid PyOBD log file.")
+
+    def bg_connection_task(self, is_demo, target_port):
+        connected = False
         if self.obd.is_connected():
             self.obd.disconnect()
             connected = False
         else:
             self.obd.simulation = is_demo
             connected = self.obd.connect(target_port)
-
         self.after(0, lambda: self.post_connection_update(connected))
 
     def post_connection_update(self, connected):
-        """Runs on Main Thread after connection attempt"""
         if hasattr(self.ui_dashboard.app, 'btn_connect'):
             self.ui_dashboard.app.btn_connect.configure(state="normal")
-
             if connected:
                 self.ui_dashboard.app.btn_connect.configure(text="DISCONNECT", fg_color=ThemeManager.get("WARNING"))
-
                 count_enabled = 0
                 count_supported = 0
-
                 pro_keys = [k for k, src in self.sensor_sources.items() if src != "Standard"]
-
                 critical_standards = ["RPM", "SPEED", "COOLANT_TEMP", "CONTROL_MODULE_VOLTAGE", "FUEL_LEVEL"]
 
                 for cmd, state in self.sensor_state.items():
-
-                    is_supported = self.obd.check_supported(cmd)
+                    is_supported = self.obd.check_supported(cmd) or getattr(self.obd, 'replay_mode', False)
 
                     if is_supported:
                         count_supported += 1
-
                         is_pro = cmd in pro_keys
                         is_critical = cmd in critical_standards
 
                         if is_pro or is_critical:
                             state["show_var"].set(True)
-
                             state["log_var"].set(True if is_pro else False)
                         else:
-
                             state["show_var"].set(False)
                             state["log_var"].set(False)
                     else:
-
                         state["show_var"].set(False)
                         state["log_var"].set(False)
 
@@ -406,7 +404,6 @@ class DashboardApp(ctk.CTk):
         self.update()
 
         dtc_groups = self.obd.get_dtc()
-
         self.ui_diagnostics.app.txt_dtc.delete("1.0", "end")
 
         total_faults = 0
@@ -416,9 +413,7 @@ class DashboardApp(ctk.CTk):
             if len(codes) > 0:
                 found_any = True
                 total_faults += len(codes)
-
                 self.ui_diagnostics.app.txt_dtc.insert("end", f"\n--- {category} ---\n", "bold")
-
                 for c in codes:
                     self.ui_diagnostics.app.txt_dtc.insert("end", f" • {c[0]}: {c[1]}\n")
 
@@ -465,7 +460,6 @@ class DashboardApp(ctk.CTk):
         )
 
         if answer:
-
             if hasattr(self.ui_diagnostics.app, 'txt_dtc'):
                 self.ui_diagnostics.app.txt_dtc.delete("1.0", "end")
                 self.ui_diagnostics.app.txt_dtc.insert("end", "Sending Clear Command...\n")
@@ -478,11 +472,8 @@ class DashboardApp(ctk.CTk):
                     self.ui_diagnostics.app.txt_dtc.insert("end", "✅ Command Sent Successfully.\n")
                     self.ui_diagnostics.app.txt_dtc.insert("end", "Waiting 3 seconds to verify...\n")
                 self.update()
-
                 time.sleep(3)
-
                 self.scan_codes()
-
                 if hasattr(self.ui_diagnostics.app, 'txt_dtc'):
                     self.ui_diagnostics.app.txt_dtc.insert("end",
                                                            "\nNOTE: If codes returned immediately, the physical part is broken/disconnected.")
@@ -524,10 +515,8 @@ class DashboardApp(ctk.CTk):
             current_speed = 0
 
             from constants import HIGH_PRIORITY_SENSORS
-
             fast_queue = set()
             slow_queue = []
-
             graph_left = self.var_graph_left.get()
             graph_right = self.var_graph_right.get()
 
