@@ -47,7 +47,14 @@ class OBDHandler:
         self.log(f"Attempting connection to {port_name if port_name else 'Auto-Scan'}...")
 
         try:
-            if port_name and port_name != "Auto":
+            if port_name and port_name.startswith("WiFi"):
+                ip_match = re.search(r'\((.*?)\)', port_name)
+                target_ip = ip_match.group(1) if ip_match else "192.168.0.10:35000"
+
+                self.log(f"Connecting via TCP/IP to {target_ip}...")
+                self.connection = obd.OBD(portstr=target_ip, fast=False, timeout=30)
+
+            elif port_name and port_name != "Auto":
                 self.connection = obd.OBD(portstr=port_name, fast=False, timeout=30)
             else:
                 self.connection = obd.OBD(fast=False, timeout=30)

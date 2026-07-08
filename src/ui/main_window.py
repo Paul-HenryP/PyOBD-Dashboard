@@ -238,11 +238,20 @@ class DashboardApp(ctk.CTk):
 
     def get_serial_ports(self):
         ports = ["Auto", "Demo Mode"]
+
+        ports.append("WiFi (192.168.0.10:35000)")
+
+
+        custom_ip = self.config.get("wifi_ip", "")
+        if custom_ip:
+            ports.append(f"WiFi Custom ({custom_ip})")
+
         try:
             for port in serial.tools.list_ports.comports():
                 ports.append(port.device)
         except Exception:
             pass
+
         return ports
 
     def refresh_ports(self):
