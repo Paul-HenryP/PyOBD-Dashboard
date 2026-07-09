@@ -1,11 +1,9 @@
 import obd
 from obd import OBDCommand
+from obd.utils import bytes_to_int
 import random
 import time
 import re
-import csv
-import threading
-from dtc_lookup import DTCDatabase
 
 
 class OBDHandler:
@@ -22,12 +20,6 @@ class OBDHandler:
         self.sim_start_time = time.time()
         self.sim_speed = 0
 
-        self.replay_mode = False
-        self.replay_active = False
-        self.replay_data = {}
-
-        self.dtc_db = DTCDatabase()
-
     def log(self, message):
         if self.log_callback:
             self.log_callback(message)
@@ -37,7 +29,7 @@ class OBDHandler:
         self.pro_defs = defs
 
     def is_connected(self):
-        return self.status == "Connected" or self.status == "Connected (SIMULATION)" or self.status == "Connected (REPLAY)"
+        return self.status == "Connected" or self.status == "Connected (SIMULATION)"
 
     def connect(self, port_name=None):
         if self.simulation:
@@ -50,12 +42,7 @@ class OBDHandler:
         self.log(f"Attempting connection to {port_name if port_name else 'Auto-Scan'}...")
 
         try:
-            if port_name and port_name.startswith("WiFi"):
-                ip_match = re.search(r'\((.*?)\)', port_name)
-                target_ip = ip_match.group(1) if ip_match else "192.168.0.10:35000"
-                self.log(f"Connecting via TCP/IP to {target_ip}...")
-                self.connection = obd.OBD(portstr=target_ip, fast=False, timeout=30)
-            elif port_name and port_name != "Auto":
+            if port_name and port_name != "Auto":
                 self.connection = obd.OBD(portstr=port_name, fast=False, timeout=30)
             else:
                 self.connection = obd.OBD(fast=False, timeout=30)
@@ -88,7 +75,6 @@ class OBDHandler:
 
     def check_supported(self, command_key):
         if self.simulation: return True
-        if getattr(self, 'replay_mode', False): return True
         if not self.is_connected(): return False
 
         if hasattr(obd.commands, command_key):
@@ -101,17 +87,15 @@ class OBDHandler:
         return False
 
     def _set_header(self, header_hex):
+        """Manually sends an AT SH command to the ELM327"""
         if not header_hex: return
         try:
-            cmd = OBDCommand("SET_HEADER", "AT SH " + header_hex, b"", lambda m: m)
+            cmd = OBDCommand("SET_HEADER", "Set Header", f"ATSH{header_hex}".encode(), 0, lambda m: m)
             self.connection.query(cmd, force=True)
-        except Exception:
-            pass
+        except Exception as e:
+            self.log(f"Header Error: {e}")
 
     def query_sensor(self, command_key):
-        if self.replay_mode:
-            return self.replay_data.get(command_key, None)
-
         if not self.is_connected(): return None
         if self.simulation: return self._simulate_data(command_key)
 
@@ -155,7 +139,8 @@ class OBDHandler:
             mode = pid_hex[:2]
             pid = pid_hex[2:]
 
-            cmd = OBDCommand("CUSTOM_PID", mode + pid, b"", lambda m: m)
+            cmd = OBDCommand("CUSTOM_PID", "Custom PID", f"{mode}{pid}".encode(), 0, lambda m: m)
+
             raw_response = self.connection.query(cmd, force=True)
 
             if raw_response.is_null(): return None
@@ -166,9 +151,6 @@ class OBDHandler:
 
         except Exception as e:
             return None
-        finally:
-            if header_hex:
-                self._set_header("7DF")
 
     def _calculate_formula(self, formula, data_bytes):
         variables = {}
@@ -189,29 +171,34 @@ class OBDHandler:
         if val > 127: return val - 256
         return val
 
+    # --- UDS DIAGNOSTICS LOGIC ---
     def _decode_uds_dtc(self, byte1, byte2, byte3):
+        """Converts 3-byte UDS hex to standard P/U/B/C code"""
         type_bits = (byte1 & 0xC0) >> 6
         prefix = {0: "P", 1: "C", 2: "B", 3: "U"}[type_bits]
+
         second_char = (byte1 & 0x30) >> 4
         rest_of_byte1 = byte1 & 0x0F
+
         hex_code = f"{prefix}{second_char}{rest_of_byte1:X}{byte2:02X}{byte3:02X}"
         return hex_code.upper()
 
     def _get_uds_dtcs(self, target_header="7E0"):
+        """Scan for UDS Service 19 faults on specific modules"""
         codes = []
         try:
             self.log(f"Attempting UDS (Service 19) Scan on {target_header}...")
             self._set_header(target_header)
             time.sleep(0.1)
 
-            cmd = OBDCommand("UDS_SCAN", "19 02 FF", b"", lambda m: m)
+            cmd = OBDCommand("UDS_SCAN", "UDS Scan", b"1902FF", 0, lambda m: m)
             response = self.connection.query(cmd, force=True)
 
             if not response.is_null() and response.messages:
                 data = response.messages[0].data
 
                 if len(data) > 0 and data[0] == 0x59:
-                    self.log(f"UDS RAW DATA: {data.hex()}")
+                    self.log(f"UDS RAW DATA ({target_header}): {data.hex()}")
 
                     i = 3
                     while i + 3 < len(data):
@@ -223,15 +210,14 @@ class OBDHandler:
                         if status & 0x09:
                             code_str = self._decode_uds_dtc(b1, b2, b3)
                             codes.append((code_str, f"UDS Extended (Status: {status:02X})"))
-
                         i += 4
                 elif len(data) > 0 and data[0] == 0x7F:
-                    self.log(f"UDS Not Supported by this module (Response: {data.hex()})")
+                    self.log(f"UDS Not Supported by {target_header} (Response: {data.hex()})")
             else:
-                self.log("No response to UDS Scan.")
+                self.log(f"No response to UDS Scan on {target_header}.")
 
         except Exception as e:
-            self.log(f"UDS Logic Error: {e}")
+            self.log(f"UDS Logic Error on {target_header}: {e}")
 
         return codes
 
@@ -242,8 +228,11 @@ class OBDHandler:
         dtc_groups = {
             "ENGINE - CONFIRMED": [],
             "ENGINE - PENDING": [],
-            "UDS / EXTENDED (Experimental)": [],
-            "TRANSMISSION": []
+            "UDS / EXTENDED (Engine)": [],
+            "TRANSMISSION": [],
+            "BODY / BCM / LIGHTS": [],
+            "ABS / BRAKES": [],
+            "AIRBAGS (SRS)": []
         }
 
         if self.simulation:
@@ -255,35 +244,40 @@ class OBDHandler:
 
             res_conf = self.connection.query(obd.commands.GET_DTC, force=True)
             if not res_conf.is_null() and res_conf.value:
-                for c in res_conf.value:
-                    enhanced_desc = self.dtc_db.lookup(c[0], c[1])
-                    dtc_groups["ENGINE - CONFIRMED"].append((c[0], enhanced_desc))
+                for c in res_conf.value: dtc_groups["ENGINE - CONFIRMED"].append(c)
 
             res_pend = self.connection.query(obd.commands.GET_CURRENT_DTC, force=True)
             if not res_pend.is_null() and res_pend.value:
-                for c in res_pend.value:
-                    enhanced_desc = self.dtc_db.lookup(c[0], c[1])
-                    dtc_groups["ENGINE - PENDING"].append((c[0], enhanced_desc))
+                for c in res_pend.value: dtc_groups["ENGINE - PENDING"].append(c)
 
             uds_codes = self._get_uds_dtcs("7E0")
             for c in uds_codes:
                 is_duplicate = any(existing[0] == c[0] for existing in dtc_groups["ENGINE - CONFIRMED"])
                 if not is_duplicate:
-                    enhanced_desc = self.dtc_db.lookup(c[0], c[1])
-                    dtc_groups["UDS / EXTENDED (Experimental)"].append((c[0], enhanced_desc))
+                    dtc_groups["UDS / EXTENDED (Engine)"].append(c)
 
             self.log("Scanning Trans (Standard)...")
             self._set_header("7E1")
             res_tcu = self.connection.query(obd.commands.GET_DTC, force=True)
             if not res_tcu.is_null() and res_tcu.value:
-                for c in res_tcu.value:
-                    enhanced_desc = self.dtc_db.lookup(c[0], c[1])
-                    dtc_groups["TRANSMISSION"].append((c[0], enhanced_desc))
+                for c in res_tcu.value: dtc_groups["TRANSMISSION"].append(c)
+
+            vag_modules = {
+                "709": "BODY / BCM / LIGHTS",
+                "746": "BODY / BCM / LIGHTS",
+                "760": "ABS / BRAKES",
+                "750": "AIRBAGS (SRS)"
+            }
+
+            for header, group in vag_modules.items():
+                codes = self._get_uds_dtcs(header)
+                for c in codes:
+                    dtc_groups[group].append(c)
 
         except Exception as e:
             self.log(f"Scan Critical Error: {e}")
         finally:
-            self._set_header("7E0")
+            self._set_header("7E0")  # Reset
 
         self.log("Scan Complete.")
         return dtc_groups
@@ -341,93 +335,3 @@ class OBDHandler:
             if name == 'CONTROL_MODULE_VOLTAGE': return round(val, 2)
             return int(val) if val > 10 else round(val, 2)
         return random.randint(0, 100)
-
-    def start_replay(self, filepath):
-        try:
-            with open(filepath, mode='r', encoding='utf-8') as file:
-                reader = csv.reader(file)
-                try:
-                    headers = next(reader)
-                except StopIteration:
-                    self.log("ERROR: CSV file is completely empty.")
-                    return False
-
-                if not headers or "Timestamp" not in headers[0]:
-                    self.log("ERROR: Invalid CSV format. Missing 'Timestamp' header.")
-                    return False
-        except Exception as e:
-            self.log(f"ERROR: Cannot read CSV file: {e}")
-            return False
-
-        self.replay_mode = True
-        self.replay_active = True
-        self.status = "Connected (REPLAY)"
-        self.log(f"Starting CSV Replay: {filepath}")
-        threading.Thread(target=self._replay_loop, args=(filepath,), daemon=True).start()
-        return True
-
-    def stop_replay(self):
-        self.replay_active = False
-        self.replay_mode = False
-        self.status = "Disconnected"
-
-    def _replay_loop(self, filepath):
-        try:
-            with open(filepath, mode='r') as file:
-                reader = csv.reader(file)
-                headers = next(reader)
-                for row in reader:
-                    if not self.replay_active:
-                        break
-                    current_state = {}
-                    for idx, key in enumerate(headers):
-                        if key != "Timestamp" and idx < len(row) and row[idx]:
-                            try:
-                                current_state[key] = float(row[idx])
-                            except ValueError:
-                                current_state[key] = row[idx]
-                    self.replay_data = current_state
-                    time.sleep(0.2)
-        except Exception as e:
-            self.log(f"Replay Error: {e}")
-        self.log("Replay Finished or Stopped.")
-        self.replay_active = False
-
-    def send_raw_command(self, cmd_string):
-        if getattr(self, 'replay_mode', False):
-            return "ERROR: Cannot send raw commands during Replay."
-
-        if not self.is_connected():
-            return "ERROR: Not connected to ELM327 adapter."
-
-        if self.simulation:
-            if "0100" in cmd_string: return "41 00 BE 1F B8 10"
-            if "AT DP" in cmd_string: return "ISO 15765-4 (CAN 11/500)"
-            if "AT" in cmd_string: return "OK"
-            return "NO DATA"
-
-        try:
-            cmd_string = str(cmd_string).strip().upper()
-
-            raw_cmd = OBDCommand("USER_RAW", cmd_string, b"", lambda m: m)
-
-            response = self.connection.query(raw_cmd, force=True)
-
-            if response.is_null():
-                return "NO DATA (Timeout or Empty)"
-
-            if response.messages:
-                raw_lines = []
-                for m in response.messages:
-                    if hasattr(m, 'raw') and isinstance(m.raw, str):
-                        raw_lines.append(m.raw)
-                    elif hasattr(m, 'data') and m.data:
-                        raw_lines.append(m.data.hex().upper())
-
-                if raw_lines:
-                    return " | ".join(raw_lines)
-
-            return "OK / NO PAYLOAD"
-
-        except Exception as e:
-            return f"ERROR: {e}"
