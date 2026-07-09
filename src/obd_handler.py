@@ -5,6 +5,7 @@ import time
 import re
 import csv
 import threading
+from dtc_lookup import DTCDatabase
 
 
 class OBDHandler:
@@ -24,6 +25,8 @@ class OBDHandler:
         self.replay_mode = False
         self.replay_active = False
         self.replay_data = {}
+
+        self.dtc_db = DTCDatabase()
 
     def log(self, message):
         if self.log_callback:
@@ -252,23 +255,30 @@ class OBDHandler:
 
             res_conf = self.connection.query(obd.commands.GET_DTC, force=True)
             if not res_conf.is_null() and res_conf.value:
-                for c in res_conf.value: dtc_groups["ENGINE - CONFIRMED"].append(c)
+                for c in res_conf.value:
+                    enhanced_desc = self.dtc_db.lookup(c[0], c[1])
+                    dtc_groups["ENGINE - CONFIRMED"].append((c[0], enhanced_desc))
 
             res_pend = self.connection.query(obd.commands.GET_CURRENT_DTC, force=True)
             if not res_pend.is_null() and res_pend.value:
-                for c in res_pend.value: dtc_groups["ENGINE - PENDING"].append(c)
+                for c in res_pend.value:
+                    enhanced_desc = self.dtc_db.lookup(c[0], c[1])
+                    dtc_groups["ENGINE - PENDING"].append((c[0], enhanced_desc))
 
             uds_codes = self._get_uds_dtcs("7E0")
             for c in uds_codes:
                 is_duplicate = any(existing[0] == c[0] for existing in dtc_groups["ENGINE - CONFIRMED"])
                 if not is_duplicate:
-                    dtc_groups["UDS / EXTENDED (Experimental)"].append(c)
+                    enhanced_desc = self.dtc_db.lookup(c[0], c[1])
+                    dtc_groups["UDS / EXTENDED (Experimental)"].append((c[0], enhanced_desc))
 
             self.log("Scanning Trans (Standard)...")
             self._set_header("7E1")
             res_tcu = self.connection.query(obd.commands.GET_DTC, force=True)
             if not res_tcu.is_null() and res_tcu.value:
-                for c in res_tcu.value: dtc_groups["TRANSMISSION"].append(c)
+                for c in res_tcu.value:
+                    enhanced_desc = self.dtc_db.lookup(c[0], c[1])
+                    dtc_groups["TRANSMISSION"].append((c[0], enhanced_desc))
 
         except Exception as e:
             self.log(f"Scan Critical Error: {e}")
