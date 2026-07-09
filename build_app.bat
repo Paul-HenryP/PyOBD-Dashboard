@@ -34,6 +34,7 @@ pyinstaller --noconsole --onefile ^
     --name="PyOBD_Pro" ^
     --icon="app_icon.ico" ^
     --add-data "%CTK_PATH%;customtkinter/" ^
+    --add-data "data;data" ^
     --collect-all matplotlib ^
     --hidden-import "serial" ^
     --hidden-import "PIL._tkinter_finder" ^

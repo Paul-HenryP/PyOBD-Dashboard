@@ -86,3 +86,13 @@ Open Source. Feel free to fork and improve!
 
 Used icon:
 <a href="https://www.flaticon.com/free-icons/motor" title="motor icons">Motor icons created by Freepik - Flaticon</a>
+
+
+## Contributors
+
+A huge thank you to everyone who has contributed to making PyOBD Professional better! 
+
+* **[Paul-HenryP](https://github.com/Paul-HenryP)** - Creator & Lead Developer
+* **[autodiag2](https://github.com/autodiag2)** - Compiled and provided the offline manufacturer DTC SQLite database, making advanced diagnostics possible without an internet connection.
+
+*Want to contribute? Check out our open issues or submit a pull request!*
