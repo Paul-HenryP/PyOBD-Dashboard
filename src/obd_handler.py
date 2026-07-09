@@ -1,11 +1,11 @@
 import obd
 from obd import OBDCommand
-from obd.utils import bytes_to_int
 import random
 import time
 import re
 import csv
 import threading
+
 
 class OBDHandler:
     def __init__(self, simulation=False, log_callback=None):
@@ -50,10 +50,8 @@ class OBDHandler:
             if port_name and port_name.startswith("WiFi"):
                 ip_match = re.search(r'\((.*?)\)', port_name)
                 target_ip = ip_match.group(1) if ip_match else "192.168.0.10:35000"
-
                 self.log(f"Connecting via TCP/IP to {target_ip}...")
                 self.connection = obd.OBD(portstr=target_ip, fast=False, timeout=30)
-
             elif port_name and port_name != "Auto":
                 self.connection = obd.OBD(portstr=port_name, fast=False, timeout=30)
             else:
@@ -384,3 +382,42 @@ class OBDHandler:
             self.log(f"Replay Error: {e}")
         self.log("Replay Finished or Stopped.")
         self.replay_active = False
+
+    def send_raw_command(self, cmd_string):
+        if getattr(self, 'replay_mode', False):
+            return "ERROR: Cannot send raw commands during Replay."
+
+        if not self.is_connected():
+            return "ERROR: Not connected to ELM327 adapter."
+
+        if self.simulation:
+            if "0100" in cmd_string: return "41 00 BE 1F B8 10"
+            if "AT DP" in cmd_string: return "ISO 15765-4 (CAN 11/500)"
+            if "AT" in cmd_string: return "OK"
+            return "NO DATA"
+
+        try:
+            cmd_string = str(cmd_string).strip().upper()
+
+            raw_cmd = OBDCommand("USER_RAW", cmd_string, b"", lambda m: m)
+
+            response = self.connection.query(raw_cmd, force=True)
+
+            if response.is_null():
+                return "NO DATA (Timeout or Empty)"
+
+            if response.messages:
+                raw_lines = []
+                for m in response.messages:
+                    if hasattr(m, 'raw') and isinstance(m.raw, str):
+                        raw_lines.append(m.raw)
+                    elif hasattr(m, 'data') and m.data:
+                        raw_lines.append(m.data.hex().upper())
+
+                if raw_lines:
+                    return " | ".join(raw_lines)
+
+            return "OK / NO PAYLOAD"
+
+        except Exception as e:
+            return f"ERROR: {e}"
